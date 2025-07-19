@@ -491,11 +491,13 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
         numberInput.value = slider.value.toString();
         numberInput.dataset.for = sliderId;
 
-        sliderInput.addEventListener('input', (e) => {
+        const inputEventListener = () => {
             slider.value = parseFloat(sliderInput.value);
             numberInput.value = sliderInput.value;
             saveSettingsDebounced();
-        });
+        };
+        sliderInput.addEventListener('input', inputEventListener);
+        $(sliderInput).on('input', inputEventListener);
 
         if (chatCompletionSettings.chat_completion_source !== 'custom') {
             rangeBlock.style.display = 'none';
