@@ -1,12 +1,17 @@
+/** Central Imports - Will make them a dedicated file later for cleanliness */
+
 import yaml from 'yaml';
 import './style.css';
 import settingsTemplate from './settings.html';
 import configTemplate from './config.html';
 import sliderTemplate from './slider.html';
+import { macros, MacroCategory } from '../../../../macros/macro-system';
+import { MacrosParser } from '../../../../macros';
+import { power_user } from '../../../../power-user';
 
 const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup } = SillyTavern.getContext();
 
-const MODULE_NAME = 'customSliders';
+const MODULE_NAME = 'sliderMacros';
 
 interface ChatCompletionRequestData {
     chat_completion_source: string;
@@ -16,6 +21,7 @@ interface ChatCompletionRequestData {
 interface SliderModel {
     name: string;
     property: string;
+    type: string;
     min: string;
     max: string;
     step: string;
@@ -276,6 +282,7 @@ function createSlider(): void {
     activeCollection.sliders.unshift({
         name: 'New Slider',
         property: '',
+        type: 'Numeric',
         min: '0',
         max: '1',
         step: '0.01',
@@ -286,12 +293,13 @@ function createSlider(): void {
     renderSliderConfigs(settings);
 }
 
-function renderHint(): void {
+// Commented out because it involves Chat Completion Sources
+/* function renderHint(): void {
     const elements = getUIElements();
     const context = SillyTavern.getContext();
     const displayHint = context.mainApi !== 'openai' || chatCompletionSettings.chat_completion_source !== 'custom';
     elements.hint.style.display = displayHint ? '' : 'none';
-}
+} */
 
 function renderSliderConfigs(settings: ExtensionSettings): void {
     const elements = getUIElements();
@@ -424,7 +432,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
     }
 
     renderCompletionSliders(settings);
-    renderHint();
+    // renderHint();
 }
 
 function renderCompletionSliders(settings: ExtensionSettings): void {
@@ -499,9 +507,10 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
         sliderInput.addEventListener('input', inputEventListener);
         $(sliderInput).on('input', inputEventListener);
 
-        if (chatCompletionSettings.chat_completion_source !== 'custom') {
-            rangeBlock.style.display = 'none';
-        }
+        // Commenting out due to mentioning Chat Completion Source
+        //        if (chatCompletionSettings.chat_completion_source !== 'custom') {
+        //            rangeBlock.style.display = 'none';
+        //        }
 
         container.appendChild(renderer.content);
     });
@@ -532,8 +541,36 @@ function mergeYamlIntoObject(obj: object, yamlString: string) {
     return obj;
 }
 
+function setupSliderTypeVisibility() {
+    const typeSelect = document.querySelector('select[name="type"]') as HTMLSelectElement;
+    const numericOnly = document.querySelector('.numeric-only') as HTMLElement;
+    const booleanOnly = document.querySelector('.boolean-only') as HTMLElement;
+    const multiSelectOnly = document.querySelector('.multiselect-only') as HTMLElement;
 
-function setupEventHandlers(settings: ExtensionSettings): void {
+    if (!typeSelect || !numericOnly || !booleanOnly || !multiSelectOnly) {
+        console.warn('Slider type elements missing in DOM');
+        return;
+    }
+
+    function updateVisibility() {
+        const type = typeSelect.value;
+
+        numericOnly.style.display = type === 'Numeric' ? '' : 'none';
+        numericOnly.querySelectorAll('input').forEach((i) => (i as HTMLInputElement).disabled = type !== 'Numeric');
+
+        booleanOnly.style.display = type === 'Boolean' ? '' : 'none';
+        booleanOnly.querySelectorAll('input, select').forEach((i) => (i as HTMLInputElement | HTMLSelectElement).disabled = type !== 'Boolean');
+
+        multiSelectOnly.style.display = type === 'MultiSelect' ? '' : 'none';
+        multiSelectOnly.querySelectorAll('input').forEach((i) => (i as HTMLInputElement).disabled = type !== 'MultiSelect');
+    }
+
+    typeSelect.addEventListener('change', updateVisibility);
+    updateVisibility(); // init
+};
+
+
+/* function setupEventHandlers(settings: ExtensionSettings): void {
     eventSource.on(event_types.CHAT_COMPLETION_SETTINGS_READY, (data: ChatCompletionRequestData) => {
         if (data.chat_completion_source !== 'custom') {
             return;
@@ -572,12 +609,13 @@ function setupEventHandlers(settings: ExtensionSettings): void {
     eventSource.on(event_types.SETTINGS_UPDATED, () => {
         renderHint();
     });
-}
+} */
 
 (async function init() {
     const settings = getSettings();
     addSettingsControls(settings);
     renderSliderConfigs(settings);
-    setupEventHandlers(settings);
+    //    setupEventHandlers(settings);
+    setupSliderTypeVisibility();
     saveSettingsDebounced();
 })();

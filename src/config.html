@@ -7,24 +7,69 @@
     </div>
     <div class="flex-container alignItemsBaseline">
         <small class="flex1 textAlignRight">Name</small>
-        <input class="flex2 text_pole textarea_compact" type="text" name="name" placeholder="e.g. Min P">
+        <input class="flex2 text_pole textarea_compact" type="text" name="name" placeholder="e.g. Macro Slider A">
     </div>
     <div class="flex-container alignItemsBaseline">
-        <small class="flex1 textAlignRight">Property</small>
-        <input class="flex2 text_pole textarea_compact" type="text" name="property" placeholder="e.g. min_p">
+        <small class="flex1 textAlignRight">Macro Var</small>
+        <input class="flex2 text_pole textarea_compact" type="text" name="property" placeholder="e.g. macroVarA">
     </div>
+    <!-- This is the type select, it controls which of the below sections are visible -->
     <div class="flex-container alignItemsBaseline">
-        <small class="flex1 textAlignRight">Min Value</small>
-        <input class="flex2 text_pole textarea_compact" type="text" name="min" placeholder="e.g. 0">
+        <small class="flex1 textAlignRight">Slider Type</small>
+        <select class="flex2 text_pole textarea_compact" name="type">
+            <!-- Numeric is default -->
+            <option value="Numeric" selected>Numeric</option>
+            <option value="Boolean">Boolean</option>
+            <option value="MultiSelect">MultiSelect</option>
+        </select>
     </div>
-    <div class="flex-container alignItemsBaseline">
-        <small class="flex1 textAlignRight">Max Value</small>
-        <input class="flex2 text_pole textarea_compact" type="text" name="max" placeholder="e.g. 1">
+    <!-- These values only show up for Numeric, the default option. They work just like other sliders -->
+    <div class="numeric-only">
+        <div class="flex-container alignItemsBaseline">
+            <small class="flex1 textAlignRight">Min Value</small>
+            <input class="flex2 text_pole textarea_compact" type="text" name="min" placeholder="e.g. 0">
+        </div>
+
+        <div class="flex-container alignItemsBaseline">
+            <small class="flex1 textAlignRight">Max Value</small>
+            <input class="flex2 text_pole textarea_compact" type="text" name="max" placeholder="e.g. 1">
+        </div>
+
+        <div class="flex-container alignItemsBaseline">
+            <small class="flex1 textAlignRight">Step</small>
+            <input class="flex2 text_pole textarea_compact" type="text" name="step" placeholder="e.g. 0.01">
+        </div>
     </div>
-    <div class="flex-container alignItemsBaseline">
-        <small class="flex1 textAlignRight">Step</small>
-        <input class="flex2 text_pole textarea_compact" type="text" name="step" placeholder="e.g. 0.01">
+    <!-- These values only show up for Booleans, they will be a dropdown to pass true or false to a var -->
+    <div class="boolean-only">
+        <div class="flex-container alignItemsBaseline">
+            <small class="flex1 textAlignRight">Default Value</small>
+            <select class="flex2 text_pole textarea_compact" name="defaultBoolean">
+                <option value="true">True</option>
+                <option value="false">False</option>
+            </select>
+        </div>
     </div>
+    <!-- These values only show up for Multi-Select, they will allow 2-4 options -->
+    <div class="multiselect-only">
+        <div class="flex-container alignItemsBaseline">
+            <small class="flex1 textAlignRight">Option 1</small>
+            <input class="flex2 text_pole textarea_compact" type="text" name="option1" placeholder="e.g. Red">
+        </div>
+        <div class="flex-container alignItemsBaseline">
+            <small class="flex1 textAlignRight">Option 2</small>
+            <input class="flex2 text_pole textarea_compact" type="text" name="option2" placeholder="e.g. Blue">
+        </div>
+        <div class="flex-container alignItemsBaseline optional-option">
+            <small class="flex1 textAlignRight">Option 3</small>
+            <input class="flex2 text_pole textarea_compact" type="text" name="option3" placeholder="Optional">
+        </div>
+        <div class="flex-container alignItemsBaseline optional-option">
+            <small class="flex1 textAlignRight">Option 4</small>
+            <input class="flex2 text_pole textarea_compact" type="text" name="option4" placeholder="Optional">
+        </div>
+    </div>
+    <!-- Buttons to move sliders up or down -->
     <div class="flex-container justifyCenter">
         <button class="menu_button menu_button_icon" name="up" type="button">
             <i class="fa-solid fa-chevron-up"></i>

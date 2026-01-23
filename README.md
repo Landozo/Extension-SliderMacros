@@ -1,6 +1,8 @@
-# Custom Sliders
+# Slider Macros
 
-Adds customizable sliders for Custom (OpenAI-compatible) source of Chat Completion API.
+Adds customizable sliders for user macros in Chat Completion.
+
+A Fork of the Sillytavern CustomSliders Extension by Cohee1207!
 
 ## License
 

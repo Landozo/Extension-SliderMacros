@@ -1,12 +1,12 @@
 {
-    "display_name": "Custom Sliders",
+    "display_name": "Slider Macros",
     "loading_order": 1,
     "requires": [],
     "optional": [],
     "js": "dist/index.js",
     "css": "",
-    "author": "Cohee1207",
-    "version": "1.0.0",
-    "homePage": "https://github.com/SillyTavern/Extension-CustomSliders",
-    "auto_update": true
+    "author": "Landozo",
+    "version": "0.0.1",
+    "homePage": "https://github.com/Landozo/Extension-SliderMacros",
+    "auto_update": false
 }
