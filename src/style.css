@@ -8,6 +8,46 @@
     font-size: 0.9em;
 }
 
-.custom_sliders_container {
-    display: contents;
+
+/* Ensure custom sliders stack vertically and take full width */
+.custom_sliders_container .range-block {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+}
+
+.custom_sliders_container .range-block-range-and-counter {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+}
+
+.custom_sliders_container .range-block-range {
+    flex: 1;
+    /* Ha ha, full width fallback because Flex is a pain! */
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+.custom_sliders_container .range-block-range input[type="range"] {
+    /* Forcing a width override to combat the inherit demons */
+    width: 100% !important;
+    margin: 0;
+    /* Add margin to avoid overlap with counter because of NEMO PRESET EXTENSION AAAAAA */
+    margin-right: 10px;
+    max-width: none;
+    flex-grow: 1;
+}
+
+.custom_sliders_container .range-block-counter {
+    /* Do not grow, do not shrink, fixed basis, potential problem for mobile later? */
+    width: 60px;
+    min-width: 60px;
+    flex: 0 0 60px;
+    text-align: right;
+    display: flex;
+    justify-content: flex-end;
 }

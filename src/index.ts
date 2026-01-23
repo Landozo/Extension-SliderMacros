@@ -27,6 +27,7 @@ interface SliderModel {
     step: string;
     value: number;
     enabled: boolean;
+    options: string[];
 }
 
 interface SliderCollection {
@@ -288,6 +289,7 @@ function createSlider(): void {
         step: '0.01',
         value: 0,
         enabled: true,
+        options: [],
     });
 
     renderSliderConfigs(settings);
@@ -329,10 +331,15 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const maxInput = renderer.content.querySelector('input[name="max"]') as HTMLInputElement;
         const stepInput = renderer.content.querySelector('input[name="step"]') as HTMLInputElement;
         const enableCheckbox = renderer.content.querySelector('input[name="enabled"]') as HTMLInputElement;
+        const typeSelect = renderer.content.querySelector('select[name="type"]') as HTMLSelectElement;
 
         const deleteButton = renderer.content.querySelector('button[name="delete"]') as HTMLButtonElement;
         const upButton = renderer.content.querySelector('button[name="up"]') as HTMLButtonElement;
         const downButton = renderer.content.querySelector('button[name="down"]') as HTMLButtonElement;
+
+        const numericOnly = renderer.content.querySelector('.numeric-only') as HTMLElement;
+        const booleanOnly = renderer.content.querySelector('.boolean-only') as HTMLElement;
+        const multiSelectOnly = renderer.content.querySelector('.multiselect-only') as HTMLElement;
 
         nameInput.value = slider.name;
         propertyInput.value = slider.property;
@@ -340,6 +347,52 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         maxInput.value = slider.max;
         stepInput.value = slider.step;
         enableCheckbox.checked = slider.enabled;
+        typeSelect.value = slider.type || 'Numeric';
+
+        // MultiSelect Inputs
+        const optionInputs = [
+            renderer.content.querySelector('input[name="option1"]') as HTMLInputElement,
+            renderer.content.querySelector('input[name="option2"]') as HTMLInputElement,
+            renderer.content.querySelector('input[name="option3"]') as HTMLInputElement,
+            renderer.content.querySelector('input[name="option4"]') as HTMLInputElement,
+        ];
+
+        if (!slider.options) {
+            slider.options = ['', '', '', ''];
+        }
+
+        // Fill option inputs
+        optionInputs.forEach((input, i) => {
+            if (input) {
+                input.value = slider.options[i] || '';
+                input.addEventListener('input', () => {
+                    slider.options[i] = input.value;
+                    // Ensure options array matches inputs
+                    renderCompletionSliders(settings);
+                    saveSettingsDebounced();
+                });
+            }
+        });
+
+        // Visibility toggle function for this specific slider instance
+        const updateVisibility = () => {
+            const type = typeSelect.value;
+            if (numericOnly) numericOnly.style.display = type === 'Numeric' ? 'block' : 'none';
+            if (booleanOnly) booleanOnly.style.display = type === 'Boolean' ? 'block' : 'none';
+            if (multiSelectOnly) multiSelectOnly.style.display = type === 'MultiSelect' ? 'block' : 'none';
+        };
+
+        // Initial update
+        updateVisibility();
+
+        // Event listener for type change
+        typeSelect.addEventListener('change', () => {
+            slider.type = typeSelect.value;
+            updateVisibility();
+            saveSettingsDebounced();
+            // Re-render sliders to reflect type change in the main UI
+            renderCompletionSliders(settings);
+        });
 
         nameInput.addEventListener('input', (e) => {
             slider.name = nameInput.value;
@@ -439,22 +492,31 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 // This function is used to render the sliders in the completion settings. It is called when the settings are loaded and when a new slider is created.
 function renderCompletionSliders(settings: ExtensionSettings): void {
     const elements = getUIElements();
+    const CONTAINER_ID = 'custom_sliders_main_container';
 
-    let container = elements.rangeBlock.querySelector('.custom_sliders_container');
+    let container = document.getElementById(CONTAINER_ID) as HTMLDivElement;
 
     if (!container) {
         container = document.createElement('div');
+        container.id = CONTAINER_ID;
         container.classList.add('custom_sliders_container');
 
-        const referenceElement = Array.from(elements.rangeBlock.querySelectorAll('.range-block:has(input[type="range"])')).pop();
-        if (!referenceElement) {
-            return;
-        }
+        // Try to insert after the last standard slider
+        // This selector must NOT pick up our own container's contents if we are re-rendering (though we checked ID first)
+        const rangeBlocks = Array.from(elements.rangeBlock.querySelectorAll('.range-block'));
+        const lastRangeBlock = rangeBlocks.pop();
 
-        referenceElement.insertAdjacentElement('afterend', container);
+        if (lastRangeBlock) {
+            lastRangeBlock.insertAdjacentElement('afterend', container);
+        } else {
+            // Fallback: just append to the main block
+            elements.rangeBlock.appendChild(container);
+        }
     }
 
+    // Clear content to ensure clean slate (removes old sliders of different types)
     container.innerHTML = '';
+
     const activeCollection = settings.collections.find(c => c.active);
     if (!activeCollection) {
         return;
@@ -464,59 +526,165 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
             return;
         }
 
-        if (slider.value < parseFloat(slider.min)) {
-            slider.value = parseFloat(slider.min);
-        }
-
-        if (slider.value > parseFloat(slider.max)) {
-            slider.value = parseFloat(slider.max);
-        }
-
         const renderer = document.createElement('template');
         renderer.innerHTML = sliderTemplate;
 
         const sliderId = CSS.escape('custom_slider_' + slider.property);
         const rangeBlock = renderer.content.querySelector('.range-block') as HTMLDivElement;
         const titleElement = renderer.content.querySelector('.range-block-title') as HTMLSpanElement;
-        const sliderInput = renderer.content.querySelector('input[type="range"]') as HTMLInputElement;
-        const numberInput = renderer.content.querySelector('input[type="number"]') as HTMLInputElement;
 
         const existingSlider = document.getElementById(sliderId);
         if (existingSlider) {
             toastr.warning('Duplicate slider property name: ' + slider.property);
+            console.warn('Duplicate slider detected:', sliderId);
             return;
         }
 
         titleElement.textContent = slider.name;
-        sliderInput.id = sliderId;
-        sliderInput.min = slider.min;
-        sliderInput.max = slider.max;
-        sliderInput.step = slider.step;
-        sliderInput.value = slider.value.toString();
+        console.log(`Rendering slider: ${slider.name} (${slider.type})`);
 
-        numberInput.id = sliderId + '_number';
-        numberInput.min = slider.min;
-        numberInput.max = slider.max;
-        numberInput.step = slider.step;
-        numberInput.value = slider.value.toString();
-        numberInput.dataset.for = sliderId;
+        // --- Numeric Slider Logic ---
+        if (slider.type === 'Numeric' || !slider.type) { // Default to Numeric
+            if (slider.value < parseFloat(slider.min)) {
+                slider.value = parseFloat(slider.min);
+            }
 
-        const inputEventListener = () => {
-            slider.value = parseFloat(sliderInput.value);
-            numberInput.value = sliderInput.value;
-            saveSettingsDebounced();
-        };
-        sliderInput.addEventListener('input', inputEventListener);
-        $(sliderInput).on('input', inputEventListener);
+            if (slider.value > parseFloat(slider.max)) {
+                slider.value = parseFloat(slider.max);
+            }
 
-        // Commenting out due to mentioning Chat Completion Source
-        //        if (chatCompletionSettings.chat_completion_source !== 'custom') {
-        //            rangeBlock.style.display = 'none';
-        //        }
+            const sliderInput = renderer.content.querySelector('input[type="range"]') as HTMLInputElement;
+            const numberInput = renderer.content.querySelector('input[type="number"]') as HTMLInputElement;
+
+            sliderInput.id = sliderId;
+            sliderInput.min = slider.min;
+            sliderInput.max = slider.max;
+            sliderInput.step = slider.step;
+            sliderInput.value = slider.value.toString();
+
+            numberInput.id = sliderId + '_number';
+            numberInput.min = slider.min;
+            numberInput.max = slider.max;
+            numberInput.step = slider.step;
+            numberInput.value = slider.value.toString();
+            numberInput.dataset.for = sliderId;
+
+            const inputEventListener = () => {
+                slider.value = parseFloat(sliderInput.value);
+                numberInput.value = sliderInput.value;
+                saveSettingsDebounced();
+                updateSliderMacros(settings);
+            };
+            sliderInput.addEventListener('input', inputEventListener);
+            $(sliderInput).on('input', inputEventListener);
+        }
+
+        // --- Boolean Slider Logic ---
+        else if (slider.type === 'Boolean') {
+            const rangeContainer = renderer.content.querySelector('.range-block-range') as HTMLDivElement;
+            const counterContainer = renderer.content.querySelector('.range-block-counter') as HTMLDivElement;
+            const sliderInput = renderer.content.querySelector('input[type="range"]') as HTMLInputElement;
+
+            // Show slider, hide others
+            if (rangeContainer) {
+                rangeContainer.style.display = '';
+                rangeContainer.style.flex = '1';
+                rangeContainer.style.width = '100%';
+            }
+
+            // Text display for True/False
+            const valueDisplay = document.createElement('span');
+            valueDisplay.style.marginLeft = '10px';
+            valueDisplay.style.fontWeight = 'bold';
+
+            if (counterContainer) {
+                counterContainer.style.display = ''; // Ensure visible
+                counterContainer.innerHTML = '';
+                counterContainer.appendChild(valueDisplay);
+            }
+
+            sliderInput.id = sliderId;
+            sliderInput.min = '0';
+            sliderInput.max = '1';
+            sliderInput.step = '1';
+
+            // User wants True to the Left (0) and False to the Right (1).
+            // Stored value: 1 = True, 0 = False.
+            // UI value: 0 = True, 1 = False.
+            // Conversion: UI = 1 - Stored
+            sliderInput.value = (1 - (slider.value ? 1 : 0)).toString();
+
+            // Set initial text
+            valueDisplay.textContent = (slider.value ? 1 : 0) === 1 ? 'True' : 'False';
+
+            const inputEventListener = () => {
+                const uiValue = parseInt(sliderInput.value, 10);
+                // Inverse logic: 0 -> True (1), 1 -> False (0)
+                const isTrue = uiValue === 0;
+                (slider.value as any) = isTrue ? 1 : 0;
+                valueDisplay.textContent = isTrue ? 'True' : 'False';
+
+                saveSettingsDebounced();
+                updateSliderMacros(settings);
+            };
+            sliderInput.addEventListener('input', inputEventListener);
+            $(sliderInput).on('input', inputEventListener);
+
+        }
+
+        // --- MultiSelect Slider Logic ---
+        else if (slider.type === 'MultiSelect') {
+            const rangeContainer = renderer.content.querySelector('.range-block-range') as HTMLDivElement;
+            const counterContainer = renderer.content.querySelector('.range-block-counter') as HTMLDivElement;
+            const sliderInput = renderer.content.querySelector('input[type="range"]') as HTMLInputElement;
+            const numberInput = renderer.content.querySelector('input[type="number"]') as HTMLInputElement;
+
+            // Ensure we have options
+            const validOptions = (slider.options || []).filter(o => o.trim() !== '');
+            if (validOptions.length < 2) {
+                // Not enough options to render a proper slider
+                titleElement.textContent += ' (Config Error: < 2 Options)';
+                return;
+            }
+
+            // Replace number input with a text display
+            const valueDisplay = document.createElement('span');
+            valueDisplay.style.marginLeft = '10px';
+            valueDisplay.style.fontWeight = 'bold';
+            if (counterContainer && numberInput) {
+                counterContainer.innerHTML = '';
+                counterContainer.appendChild(valueDisplay);
+            }
+
+            sliderInput.id = sliderId;
+            sliderInput.min = '0';
+            sliderInput.max = (validOptions.length - 1).toString();
+            sliderInput.step = '1';
+
+            // Ensure value is within bounds
+            if (slider.value < 0 || slider.value >= validOptions.length) {
+                slider.value = 0;
+            }
+
+            sliderInput.value = slider.value.toString();
+            valueDisplay.textContent = validOptions[slider.value];
+
+            const inputEventListener = () => {
+                const index = parseInt(sliderInput.value, 10);
+                slider.value = index;
+                valueDisplay.textContent = validOptions[index] || '';
+                saveSettingsDebounced();
+                updateSliderMacros(settings);
+            };
+
+            sliderInput.addEventListener('input', inputEventListener);
+            $(sliderInput).on('input', inputEventListener);
+        }
 
         container.appendChild(renderer.content);
     });
-    // Update the macros based on the current settings
+
+    // Update the macros based on the current settings (initial load)
     updateSliderMacros(settings);
 }
 
@@ -545,34 +713,7 @@ function mergeYamlIntoObject(obj: object, yamlString: string) {
     return obj;
 }
 
-// This function is used to set up the visibility of the slider type options in the settings UI.
-function setupSliderTypeVisibility() {
-    const typeSelect = document.querySelector('select[name="type"]') as HTMLSelectElement;
-    const numericOnly = document.querySelector('.numeric-only') as HTMLElement;
-    const booleanOnly = document.querySelector('.boolean-only') as HTMLElement;
-    const multiSelectOnly = document.querySelector('.multiselect-only') as HTMLElement;
 
-    if (!typeSelect || !numericOnly || !booleanOnly || !multiSelectOnly) {
-        console.warn('Slider type elements missing in DOM');
-        return;
-    }
-
-    function updateVisibility() {
-        const type = typeSelect.value;
-
-        numericOnly.style.display = type === 'Numeric' ? '' : 'none';
-        numericOnly.querySelectorAll('input').forEach((i) => (i as HTMLInputElement).disabled = type !== 'Numeric');
-
-        booleanOnly.style.display = type === 'Boolean' ? '' : 'none';
-        booleanOnly.querySelectorAll('input, select').forEach((i) => (i as HTMLInputElement | HTMLSelectElement).disabled = type !== 'Boolean');
-
-        multiSelectOnly.style.display = type === 'MultiSelect' ? '' : 'none';
-        multiSelectOnly.querySelectorAll('input').forEach((i) => (i as HTMLInputElement).disabled = type !== 'MultiSelect');
-    }
-
-    typeSelect.addEventListener('change', updateVisibility);
-    updateVisibility(); // init
-};
 
 
 // This function is used to update the macros based on the current slider settings above.
@@ -587,7 +728,19 @@ function updateSliderMacros(settings: ExtensionSettings) {
             return;
         }
 
-        const macroHandler = () => slider.value.toString();
+
+
+        let macroHandler: () => string;
+
+        if (slider.type === 'MultiSelect') {
+            const validOptions = (slider.options || []).filter(o => o.trim() !== '');
+            macroHandler = () => validOptions[slider.value] || '';
+        } else if (slider.type === 'Boolean') {
+            // 1 = True, 0 = False
+            macroHandler = () => (slider.value === 1 ? 'true' : 'false');
+        } else {
+            macroHandler = () => slider.value.toString();
+        }
         const description = `Custom Slider: ${slider.name}`;
         if (power_user.experimental_macro_engine) {
             macros.register(slider.property, {
@@ -648,6 +801,6 @@ function updateSliderMacros(settings: ExtensionSettings) {
     addSettingsControls(settings);
     renderSliderConfigs(settings);
     //    setupEventHandlers(settings);
-    setupSliderTypeVisibility();
+
     saveSettingsDebounced();
 })();
