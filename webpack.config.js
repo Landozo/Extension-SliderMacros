@@ -12,6 +12,16 @@ export default {
     },
     resolve: {
         extensions: ['.ts', '.js'],
+        alias: {
+            '/scripts': path.resolve(__dirname, '../../../../scripts'),
+            '/script.js': path.resolve(__dirname, '../../../../script.js'),
+        },
+        fallback: {
+            "fs": false,
+            "http": false,
+            "https": false,
+            "url": false,
+        },
     },
     module: {
         rules: [

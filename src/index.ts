@@ -5,11 +5,11 @@ import './style.css';
 import settingsTemplate from './settings.html';
 import configTemplate from './config.html';
 import sliderTemplate from './slider.html';
-import { macros, MacroCategory } from '../../../../macros/macro-system';
-import { MacrosParser } from '../../../../macros';
-import { power_user } from '../../../../power-user';
+// import { macros, MacroCategory } from '../../../../macros/macro-system.js';
+// import { MacrosParser } from '../../../../macros.js';
+// import { MacroCategory } from '../../../../macros/engine/MacroRegistry';
 
-const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup } = SillyTavern.getContext();
+const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros } = SillyTavern.getContext();
 
 const MODULE_NAME = 'sliderMacros';
 
@@ -435,6 +435,8 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
     // renderHint();
 }
 
+
+// This function is used to render the sliders in the completion settings. It is called when the settings are loaded and when a new slider is created.
 function renderCompletionSliders(settings: ExtensionSettings): void {
     const elements = getUIElements();
 
@@ -514,6 +516,8 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
         container.appendChild(renderer.content);
     });
+    // Update the macros based on the current settings
+    updateSliderMacros(settings);
 }
 
 function mergeYamlIntoObject(obj: object, yamlString: string) {
@@ -541,6 +545,7 @@ function mergeYamlIntoObject(obj: object, yamlString: string) {
     return obj;
 }
 
+// This function is used to set up the visibility of the slider type options in the settings UI.
 function setupSliderTypeVisibility() {
     const typeSelect = document.querySelector('select[name="type"]') as HTMLSelectElement;
     const numericOnly = document.querySelector('.numeric-only') as HTMLElement;
@@ -570,6 +575,33 @@ function setupSliderTypeVisibility() {
 };
 
 
+// This function is used to update the macros based on the current slider settings above.
+function updateSliderMacros(settings: ExtensionSettings) {
+    const activeCollection = settings.collections.find(c => c.active);
+    if (!activeCollection) {
+        return;
+    }
+    // Loop through each slider in the active collection and register it as a macro.
+    activeCollection.sliders.forEach((slider) => {
+        if (!slider.enabled || !slider.property) {
+            return;
+        }
+
+        const macroHandler = () => slider.value.toString();
+        const description = `Custom Slider: ${slider.name}`;
+        if (power_user.experimental_macro_engine) {
+            macros.register(slider.property, {
+                category: macros.category.PROMPTS,
+                description: description,
+                handler: macroHandler,
+            });
+            //        } else {
+            //            MacrosParser.registerMacro(slider.property, macroHandler, description);
+        }
+    });
+};
+
+// The below is commented out because it's not needed for this extension, it's all chat completion stuff. The original extension sends the sliders to the chat completion request, but this extension doesn't need to do that.
 /* function setupEventHandlers(settings: ExtensionSettings): void {
     eventSource.on(event_types.CHAT_COMPLETION_SETTINGS_READY, (data: ChatCompletionRequestData) => {
         if (data.chat_completion_source !== 'custom') {
