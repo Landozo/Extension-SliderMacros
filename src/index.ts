@@ -666,13 +666,20 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
                 slider.value = 0;
             }
 
+            const formatOption = (text: string) => {
+                return text.length > 10 ? text.substring(0, 10) + '...' : text;
+            };
+
             sliderInput.value = slider.value.toString();
-            valueDisplay.textContent = validOptions[slider.value];
+            valueDisplay.textContent = formatOption(validOptions[slider.value]);
+            valueDisplay.title = validOptions[slider.value]; // Tooltip for full text
 
             const inputEventListener = () => {
                 const index = parseInt(sliderInput.value, 10);
                 slider.value = index;
-                valueDisplay.textContent = validOptions[index] || '';
+                const text = validOptions[index] || '';
+                valueDisplay.textContent = formatOption(text);
+                valueDisplay.title = text;
                 saveSettingsDebounced();
                 updateSliderMacros(settings);
             };
