@@ -1,8 +1,8 @@
-#custom_sliders_list .textAlignRight {
+#slider_macros_list .textAlignRight {
     text-align: right;
 }
 
-#custom_sliders_list .empty-message {
+#slider_macros_list .empty-message {
     text-align: center;
     opacity: 0.8;
     font-size: 0.9em;
@@ -10,21 +10,21 @@
 
 
 /* Ensure custom sliders stack vertically and take full width */
-.custom_sliders_container .range-block {
+.slider_macros_container .range-block {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     width: 100%;
 }
 
-.custom_sliders_container .range-block-range-and-counter {
+.slider_macros_container .range-block-range-and-counter {
     display: flex;
     flex-direction: row;
     align-items: center;
     width: 100%;
 }
 
-.custom_sliders_container .range-block-range {
+.slider_macros_container .range-block-range {
     flex: 1;
     /* Ha ha, full width fallback because Flex is a pain! */
     width: 100%;
@@ -32,7 +32,7 @@
     align-items: center;
 }
 
-.custom_sliders_container .range-block-range input[type="range"] {
+.slider_macros_container .range-block-range input[type="range"] {
     /* Forcing a width override to combat the inherit demons */
     width: 100% !important;
     margin: 0;
@@ -42,7 +42,7 @@
     flex-grow: 1;
 }
 
-.custom_sliders_container .range-block-counter {
+.slider_macros_container .range-block-counter {
     /* Do not grow, do not shrink, fixed basis, potential problem for mobile later? */
     width: 60px;
     min-width: 60px;

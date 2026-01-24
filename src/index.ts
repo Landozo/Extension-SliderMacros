@@ -9,7 +9,7 @@ import sliderTemplate from './slider.html';
 // import { MacrosParser } from '../../../../macros.js';
 // import { MacroCategory } from '../../../../macros/engine/MacroRegistry';
 
-const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros } = SillyTavern.getContext();
+const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser } = (SillyTavern.getContext() as any);
 
 const MODULE_NAME = 'sliderMacros';
 
@@ -89,22 +89,22 @@ export function getSettings(): ExtensionSettings {
 
 function getUIElements() {
     return {
-        create: document.getElementById('custom_sliders_create') as HTMLInputElement,
-        list: document.getElementById('custom_sliders_list') as HTMLDivElement,
+        create: document.getElementById('slider_macros_create') as HTMLInputElement,
+        list: document.getElementById('slider_macros_list') as HTMLDivElement,
         rangeBlock: document.getElementById('range_block_openai') as HTMLDivElement,
-        collections: document.getElementById('custom_sliders_collections') as HTMLSelectElement,
-        createCollection: document.getElementById('custom_sliders_create_collection') as HTMLDivElement,
-        deleteCollection: document.getElementById('custom_sliders_delete_collection') as HTMLDivElement,
-        bindToPreset: document.getElementById('custom_sliders_bind_to_preset') as HTMLDivElement,
-        hint: document.getElementById('custom_sliders_hint') as HTMLDivElement,
-        importFile: document.getElementById('custom_sliders_import_file') as HTMLInputElement,
-        importCollection: document.getElementById('custom_sliders_import_collection') as HTMLDivElement,
-        exportCollection: document.getElementById('custom_sliders_export_collection') as HTMLDivElement,
+        collections: document.getElementById('slider_macros_collections') as HTMLSelectElement,
+        createCollection: document.getElementById('slider_macros_create_collection') as HTMLDivElement,
+        deleteCollection: document.getElementById('slider_macros_delete_collection') as HTMLDivElement,
+        bindToPreset: document.getElementById('slider_macros_bind_to_preset') as HTMLDivElement,
+        hint: document.getElementById('slider_macros_hint') as HTMLDivElement,
+        importFile: document.getElementById('slider_macros_import_file') as HTMLInputElement,
+        importCollection: document.getElementById('slider_macros_import_collection') as HTMLDivElement,
+        exportCollection: document.getElementById('slider_macros_export_collection') as HTMLDivElement,
     };
 }
 
 export function addSettingsControls(settings: ExtensionSettings): void {
-    const settingsContainer = document.getElementById('custom_sliders_container') ?? document.getElementById('extensions_settings');
+    const settingsContainer = document.getElementById('slider_macros_container') ?? document.getElementById('extensions_settings');
     if (!settingsContainer) {
         return;
     }
@@ -247,6 +247,7 @@ async function createCollection(): Promise<void> {
     renderSliderConfigs(settings);
 }
 
+// This function is used to bind the active collection to a preset.
 function bindToPreset(): void {
     const settings = getSettings();
     const presetName = chatCompletionSettings.preset_settings_openai;
@@ -274,6 +275,7 @@ function bindToPreset(): void {
     renderSliderConfigs(settings);
 }
 
+// This function is used to create a new slider from the settings panel.
 function createSlider(): void {
     const settings = getSettings();
     const activeCollection = settings.collections.find(c => c.active);
@@ -295,14 +297,8 @@ function createSlider(): void {
     renderSliderConfigs(settings);
 }
 
-// Commented out because it involves Chat Completion Sources
-/* function renderHint(): void {
-    const elements = getUIElements();
-    const context = SillyTavern.getContext();
-    const displayHint = context.mainApi !== 'openai' || chatCompletionSettings.chat_completion_source !== 'custom';
-    elements.hint.style.display = displayHint ? '' : 'none';
-} */
 
+// This function is used to render the slider options in the settings panel.
 function renderSliderConfigs(settings: ExtensionSettings): void {
     const elements = getUIElements();
 
@@ -492,14 +488,14 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 // This function is used to render the sliders in the completion settings. It is called when the settings are loaded and when a new slider is created.
 function renderCompletionSliders(settings: ExtensionSettings): void {
     const elements = getUIElements();
-    const CONTAINER_ID = 'custom_sliders_main_container';
+    const CONTAINER_ID = 'slider_macros_main_container';
 
     let container = document.getElementById(CONTAINER_ID) as HTMLDivElement;
 
     if (!container) {
         container = document.createElement('div');
         container.id = CONTAINER_ID;
-        container.classList.add('custom_sliders_container');
+        container.classList.add('slider_macros_container');
 
         // Try to insert after the last standard slider
         // This selector must NOT pick up our own container's contents if we are re-rendering (though we checked ID first)
@@ -529,7 +525,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
         const renderer = document.createElement('template');
         renderer.innerHTML = sliderTemplate;
 
-        const sliderId = CSS.escape('custom_slider_' + slider.property);
+        const sliderId = CSS.escape('slider_macro_' + slider.property);
         const rangeBlock = renderer.content.querySelector('.range-block') as HTMLDivElement;
         const titleElement = renderer.content.querySelector('.range-block-title') as HTMLSpanElement;
 
@@ -735,8 +731,6 @@ function updateSliderMacros(settings: ExtensionSettings) {
             return;
         }
 
-
-
         let macroHandler: () => string;
 
         if (slider.type === 'MultiSelect') {
@@ -748,40 +742,23 @@ function updateSliderMacros(settings: ExtensionSettings) {
         } else {
             macroHandler = () => slider.value.toString();
         }
-        const description = `Custom Slider: ${slider.name}`;
+        const description = `Slider Macro: ${slider.name}`;
         if (power_user.experimental_macro_engine) {
             macros.register(slider.property, {
                 category: macros.category.PROMPTS,
                 description: description,
                 handler: macroHandler,
             });
-            //        } else {
-            //            MacrosParser.registerMacro(slider.property, macroHandler, description);
+            // Fallback for old macro engine.Remove this once the experimental macro engine is the default.
+        } else {
+            MacrosParser.registerMacro(slider.property, macroHandler, description);
         }
     });
 };
 
-// The below is commented out because it's not needed for this extension, it's all chat completion stuff. The original extension sends the sliders to the chat completion request, but this extension doesn't need to do that.
-/* function setupEventHandlers(settings: ExtensionSettings): void {
-    eventSource.on(event_types.CHAT_COMPLETION_SETTINGS_READY, (data: ChatCompletionRequestData) => {
-        if (data.chat_completion_source !== 'custom') {
-            return;
-        }
-        const activeCollection = settings.collections.find(c => c.active);
-        if (!activeCollection) {
-            return;
-        }
 
-        const customBody = mergeYamlIntoObject({}, data.custom_include_body);
-        const sliders = activeCollection.sliders.filter(s => s.enabled).reduce((acc, slider) => {
-            if (slider.property && !isNaN(slider.value)) {
-                acc[slider.property] = slider.value;
-            }
-            return acc;
-        }, {} as Record<string, number>);
-        Object.assign(customBody, sliders);
-        data.custom_include_body = yaml.stringify(customBody);
-    });
+// Preset binding event handler without the chat completion body append stuff.
+function setupEventHandlers(settings: ExtensionSettings): void {
     eventSource.on(event_types.OAI_PRESET_CHANGED_AFTER, () => {
         const presetName = chatCompletionSettings.preset_settings_openai;
         const activeCollection = settings.collections.find(c => c.active);
@@ -796,18 +773,16 @@ function updateSliderMacros(settings: ExtensionSettings) {
 
             saveSettingsDebounced();
             renderSliderConfigs(settings);
+            // Re-render the completions sliders to reflect the new collection
+            renderCompletionSliders(settings);
         }
     });
-    eventSource.on(event_types.SETTINGS_UPDATED, () => {
-        renderHint();
-    });
-} */
+}
 
 (async function init() {
     const settings = getSettings();
     addSettingsControls(settings);
     renderSliderConfigs(settings);
-    //    setupEventHandlers(settings);
-
+    setupEventHandlers(settings);
     saveSettingsDebounced();
 })();
