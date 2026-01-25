@@ -2,6 +2,13 @@
    SLIDER MACROS - SETTINGS PANEL STYLES
    ============================================ */
 
+/* --- Settings Drawer Background --- */
+#slider_macros_settings .inline-drawer-content {
+    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.15));
+    padding: 12px;
+    border-radius: 0 0 8px 8px;
+}
+
 /* --- Toolbar --- */
 .slider_macros_toolbar {
     margin-bottom: 12px;
@@ -47,14 +54,14 @@
 
 .slider_macros_btn_create:hover {
     border-color: var(--SmartThemeQuoteColor, #888);
-    background: var(--SmartThemeBlurTintColor, rgba(255,255,255,0.03));
+    background: rgba(255,255,255,0.05);
 }
 
 /* --- Slider List --- */
 .slider_macros_list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
 }
 
 .slider_macros_list .empty-message {
@@ -64,11 +71,15 @@
     padding: 24px 16px;
     border: 1px dashed var(--SmartThemeBorderColor, #444);
     border-radius: 8px;
+    background: rgba(0,0,0,0.2);
 }
 
-/* --- Slider Card --- */
+/* ============================================
+   COLLAPSIBLE SLIDER CARDS
+   ============================================ */
+
 .slider_macros_card {
-    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.2));
+    background: var(--SmartThemeChatTintColor, rgba(20,20,30,0.95));
     border: 1px solid var(--SmartThemeBorderColor, #444);
     border-radius: 8px;
     overflow: hidden;
@@ -79,27 +90,53 @@
     border-color: var(--SmartThemeQuoteColor, #666);
 }
 
-/* Card Header */
+/* --- Card Header (Always Visible) --- */
 .slider_macros_card_header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 10px;
     padding: 10px 12px;
-    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.15));
-    border-bottom: 1px solid var(--SmartThemeBorderColor, #333);
+    background: rgba(255,255,255,0.03);
+    cursor: pointer;
+    user-select: none;
 }
 
-.slider_macros_card_title {
+.slider_macros_card_header:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+/* Toggle Chevron */
+.slider_macros_card_toggle {
     display: flex;
-    align-items: baseline;
-    gap: 8px;
-    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    flex-shrink: 0;
+}
+
+.slider_macros_card_chevron {
+    font-size: 0.85em;
+    color: var(--SmartThemeQuoteColor, #888);
+    transition: transform 0.2s ease;
+}
+
+.slider_macros_card[data-expanded="true"] .slider_macros_card_chevron {
+    transform: rotate(90deg);
+}
+
+/* Summary Info */
+.slider_macros_card_summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .slider_macros_card_name {
     font-weight: 600;
-    font-size: 1em;
+    font-size: 0.95em;
     color: var(--SmartThemeBodyColor, #eee);
     white-space: nowrap;
     overflow: hidden;
@@ -110,7 +147,14 @@
     font-size: 0.8em;
     color: var(--SmartThemeQuoteColor, #888);
     font-family: monospace;
-    opacity: 0.8;
+    background: rgba(0,0,0,0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.slider_macros_card_macro:empty {
+    display: none;
 }
 
 .slider_macros_card_macro:not(:empty)::before {
@@ -121,30 +165,57 @@
     content: '}}';
 }
 
+.slider_macros_card_type_badge {
+    font-size: 0.7em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--SmartThemeQuoteColor, #777);
+    background: rgba(255,255,255,0.08);
+    padding: 3px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+/* Header Controls */
 .slider_macros_card_controls {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     flex-shrink: 0;
 }
 
 .slider_macros_toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
     cursor: pointer;
+    margin-right: 8px;
 }
 
-.slider_macros_toggle_label {
-    font-size: 0.85em;
-    opacity: 0.8;
+.slider_macros_btn_icon {
+    opacity: 0.5;
+    padding: 4px 6px;
+    min-width: unset;
 }
 
-/* Card Body */
+.slider_macros_btn_icon:hover {
+    opacity: 1;
+}
+
+/* --- Card Body (Collapsible) --- */
 .slider_macros_card_body {
+    display: none;
     padding: 12px;
+    border-top: 1px solid var(--SmartThemeBorderColor, #333);
+    background: rgba(0,0,0,0.15);
+}
+
+.slider_macros_card[data-expanded="true"] .slider_macros_card_body {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
+/* --- Field Styles --- */
 .slider_macros_field_group {
     display: flex;
     gap: 10px;
@@ -203,7 +274,7 @@
 .slider_macros_macro_prefix,
 .slider_macros_macro_suffix {
     padding: 6px 8px;
-    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.3));
+    background: rgba(0,0,0,0.4);
     border: 1px solid var(--SmartThemeBorderColor, #444);
     font-family: monospace;
     font-size: 0.9em;
@@ -222,43 +293,37 @@
 
 /* Type sections */
 .slider_macros_type_section {
-    padding-top: 8px;
+    padding-top: 10px;
     border-top: 1px dashed var(--SmartThemeBorderColor, #333);
     margin-top: 4px;
 }
 
-/* Card Footer */
-.slider_macros_card_footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.1));
+/* Delete Row */
+.slider_macros_card_delete_row {
+    padding-top: 12px;
+    margin-top: 8px;
     border-top: 1px solid var(--SmartThemeBorderColor, #333);
-}
-
-.slider_macros_card_actions_left,
-.slider_macros_card_actions_right {
     display: flex;
-    gap: 4px;
+    justify-content: flex-end;
 }
 
-.slider_macros_btn_subtle {
-    opacity: 0.6;
-    transition: opacity 0.2s ease;
-}
-
-.slider_macros_btn_subtle:hover {
-    opacity: 1;
-}
-
-.slider_macros_btn_danger {
+.slider_macros_btn_danger_full {
     color: var(--SmartThemeQuoteColor, #888);
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, background 0.2s ease;
 }
 
-.slider_macros_btn_danger:hover {
+.slider_macros_btn_danger_full:hover {
     color: #e74c3c;
+    background: rgba(231, 76, 60, 0.1);
+}
+
+/* --- Disabled State --- */
+.slider_macros_card[data-disabled="true"] {
+    opacity: 0.5;
+}
+
+.slider_macros_card[data-disabled="true"] .slider_macros_card_header {
+    background: rgba(0,0,0,0.1);
 }
 
 /* ============================================

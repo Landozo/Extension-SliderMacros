@@ -342,8 +342,10 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         renderer.innerHTML = configTemplate;
 
         const card = renderer.content.querySelector('.slider_macros_card') as HTMLDivElement;
+        const cardHeader = renderer.content.querySelector('.slider_macros_card_header') as HTMLDivElement;
         const cardNameDisplay = renderer.content.querySelector('.slider_macros_card_name') as HTMLSpanElement;
         const cardMacroDisplay = renderer.content.querySelector('.slider_macros_card_macro') as HTMLSpanElement;
+        const cardTypeBadge = renderer.content.querySelector('.slider_macros_card_type_badge') as HTMLSpanElement;
 
         const nameInput = renderer.content.querySelector('input[name="name"]') as HTMLInputElement;
         const propertyInput = renderer.content.querySelector('input[name="property"]') as HTMLInputElement;
@@ -373,11 +375,23 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         // Update card header display
         cardNameDisplay.textContent = slider.name || 'New Slider';
         cardMacroDisplay.textContent = slider.property || '';
+        cardTypeBadge.textContent = slider.type || 'Numeric';
 
         // Update card visual state based on enabled
         if (!slider.enabled) {
-            card.style.opacity = '0.6';
+            card.dataset.disabled = 'true';
         }
+
+        // Expand/collapse toggle - click on header (excluding controls)
+        cardHeader.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            // Don't toggle if clicking on controls (checkbox, buttons)
+            if (target.closest('.slider_macros_card_controls')) {
+                return;
+            }
+            const isExpanded = card.dataset.expanded === 'true';
+            card.dataset.expanded = isExpanded ? 'false' : 'true';
+        });
 
         // MultiSelect Inputs
         const optionInputs = [
@@ -418,6 +432,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         // Event listener for type change
         typeSelect.addEventListener('change', () => {
             slider.type = typeSelect.value;
+            cardTypeBadge.textContent = slider.type;
             updateVisibility();
             saveSettingsDebounced();
             // Re-render sliders to reflect type change in the main UI
@@ -458,7 +473,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 
         enableCheckbox.addEventListener('change', (e) => {
             slider.enabled = enableCheckbox.checked;
-            card.style.opacity = slider.enabled ? '1' : '0.6';
+            card.dataset.disabled = slider.enabled ? 'false' : 'true';
             renderCompletionSliders(settings);
             saveSettingsDebounced();
         });

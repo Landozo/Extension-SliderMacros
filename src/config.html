@@ -1,14 +1,23 @@
-<div class="slider_macros_card">
+<div class="slider_macros_card" data-expanded="false">
     <div class="slider_macros_card_header">
-        <div class="slider_macros_card_title">
+        <div class="slider_macros_card_toggle">
+            <i class="fa-solid fa-chevron-right slider_macros_card_chevron"></i>
+        </div>
+        <div class="slider_macros_card_summary">
             <span class="slider_macros_card_name" data-field="name">New Slider</span>
             <span class="slider_macros_card_macro" data-field="property"></span>
+            <span class="slider_macros_card_type_badge" data-field="type">Numeric</span>
         </div>
         <div class="slider_macros_card_controls">
-            <label class="checkbox_label slider_macros_toggle">
+            <label class="checkbox_label slider_macros_toggle" title="Enable/Disable Slider">
                 <input type="checkbox" name="enabled">
-                <span class="slider_macros_toggle_label">Active</span>
             </label>
+            <button class="menu_button menu_button_icon slider_macros_btn_icon" name="up" type="button" title="Move Up">
+                <i class="fa-solid fa-chevron-up"></i>
+            </button>
+            <button class="menu_button menu_button_icon slider_macros_btn_icon" name="down" type="button" title="Move Down">
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
         </div>
     </div>
     <div class="slider_macros_card_body">
@@ -84,20 +93,11 @@
                 </div>
             </div>
         </div>
-    </div>
-    <div class="slider_macros_card_footer">
-        <div class="slider_macros_card_actions_left">
-            <button class="menu_button menu_button_icon slider_macros_btn_subtle" name="up" type="button" title="Move Up">
-                <i class="fa-solid fa-chevron-up"></i>
-            </button>
-            <button class="menu_button menu_button_icon slider_macros_btn_subtle" name="down" type="button" title="Move Down">
-                <i class="fa-solid fa-chevron-down"></i>
-            </button>
-        </div>
-        <div class="slider_macros_card_actions_right">
-            <button class="menu_button menu_button_icon slider_macros_btn_danger" name="delete" type="button" title="Delete Slider">
+        <!-- Delete action at bottom of expanded view -->
+        <div class="slider_macros_card_delete_row">
+            <button class="menu_button menu_button_icon slider_macros_btn_danger_full" name="delete" type="button">
                 <i class="fa-solid fa-trash-alt"></i>
-                <span>Delete</span>
+                <span>Delete Slider</span>
             </button>
         </div>
     </div>
