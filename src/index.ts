@@ -12,6 +12,25 @@ import sliderTemplate from './slider.html';
 const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser } = (SillyTavern.getContext() as any);
 
 const MODULE_NAME = 'sliderMacros';
+const DEBOUNCE_DELAY = 300;
+
+// Local debounce utility for text inputs
+function debounce<T extends (...args: unknown[]) => void>(fn: T, delay: number): T {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    return ((...args: unknown[]) => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        timeoutId = setTimeout(() => {
+            fn(...args);
+            timeoutId = null;
+        }, delay);
+    }) as T;
+}
+
+// Debounced versions for text input handlers
+const debouncedSaveSettings = debounce(() => saveSettingsDebounced(), DEBOUNCE_DELAY);
+const createDebouncedRender = (settings: ExtensionSettings) => debounce(() => renderCompletionSliders(settings), DEBOUNCE_DELAY);
 
 interface ChatCompletionRequestData {
     chat_completion_source: string;
@@ -301,6 +320,7 @@ function createSlider(): void {
 // This function is used to render the slider options in the settings panel.
 function renderSliderConfigs(settings: ExtensionSettings): void {
     const elements = getUIElements();
+    const debouncedRender = createDebouncedRender(settings);
 
     elements.list.innerHTML = '';
     const activeCollection = settings.collections.find(c => c.active);
@@ -364,8 +384,8 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                 input.addEventListener('input', () => {
                     slider.options[i] = input.value;
                     // Ensure options array matches inputs
-                    renderCompletionSliders(settings);
-                    saveSettingsDebounced();
+                    debouncedRender();
+                    debouncedSaveSettings();
                 });
             }
         });
@@ -392,32 +412,32 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 
         nameInput.addEventListener('input', (e) => {
             slider.name = nameInput.value;
-            renderCompletionSliders(settings);
-            saveSettingsDebounced();
+            debouncedRender();
+            debouncedSaveSettings();
         });
 
         propertyInput.addEventListener('input', (e) => {
             slider.property = propertyInput.value;
-            renderCompletionSliders(settings);
-            saveSettingsDebounced();
+            debouncedRender();
+            debouncedSaveSettings();
         });
 
         minInput.addEventListener('input', (e) => {
             slider.min = minInput.value;
-            renderCompletionSliders(settings);
-            saveSettingsDebounced();
+            debouncedRender();
+            debouncedSaveSettings();
         });
 
         maxInput.addEventListener('input', (e) => {
             slider.max = maxInput.value;
-            renderCompletionSliders(settings);
-            saveSettingsDebounced();
+            debouncedRender();
+            debouncedSaveSettings();
         });
 
         stepInput.addEventListener('input', (e) => {
             slider.step = stepInput.value;
-            renderCompletionSliders(settings);
-            saveSettingsDebounced();
+            debouncedRender();
+            debouncedSaveSettings();
         });
 
         enableCheckbox.addEventListener('change', (e) => {
@@ -488,29 +508,96 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 // This function is used to render the sliders in the completion settings. It is called when the settings are loaded and when a new slider is created.
 function renderCompletionSliders(settings: ExtensionSettings): void {
     const elements = getUIElements();
+    const DRAWER_ID = 'slider_macros_drawer';
     const CONTAINER_ID = 'slider_macros_main_container';
+    const COLLECTION_SELECT_ID = 'slider_macros_completion_collections';
 
-    let container = document.getElementById(CONTAINER_ID) as HTMLDivElement;
+    let drawer = document.getElementById(DRAWER_ID) as HTMLDivElement;
 
-    if (!container) {
-        container = document.createElement('div');
+    if (!drawer) {
+        // Create the inline-drawer wrapper
+        drawer = document.createElement('div');
+        drawer.id = DRAWER_ID;
+        drawer.className = 'inline-drawer m-t-1 wide100p';
+
+        // Create drawer header with toggle
+        const drawerHeader = document.createElement('div');
+        drawerHeader.className = 'inline-drawer-toggle inline-drawer-header';
+
+        const drawerTitle = document.createElement('b');
+        drawerTitle.textContent = 'Custom Sliders';
+        drawerHeader.appendChild(drawerTitle);
+
+        const drawerIcon = document.createElement('div');
+        drawerIcon.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down down';
+        drawerHeader.appendChild(drawerIcon);
+
+        drawer.appendChild(drawerHeader);
+
+        // Create drawer content
+        const drawerContent = document.createElement('div');
+        drawerContent.className = 'inline-drawer-content';
+
+        // Create collection selector row
+        const collectionRow = document.createElement('div');
+        collectionRow.className = 'flex-container m-b-1';
+
+        const collectionLabel = document.createElement('span');
+        collectionLabel.textContent = 'Collection:';
+        collectionLabel.className = 'flex0';
+        collectionLabel.style.marginRight = '10px';
+        collectionRow.appendChild(collectionLabel);
+
+        const collectionSelect = document.createElement('select');
+        collectionSelect.id = COLLECTION_SELECT_ID;
+        collectionSelect.className = 'text_pole flex1';
+        collectionSelect.addEventListener('change', () => {
+            const selectedName = collectionSelect.value;
+            settings.collections.forEach((collection) => {
+                collection.active = collection.name === selectedName;
+            });
+            saveSettingsDebounced();
+            renderSliderConfigs(settings);
+        });
+        collectionRow.appendChild(collectionSelect);
+
+        drawerContent.appendChild(collectionRow);
+
+        // Create container for sliders
+        const container = document.createElement('div');
         container.id = CONTAINER_ID;
-        container.classList.add('slider_macros_container');
+        container.className = 'slider_macros_container';
+        drawerContent.appendChild(container);
+
+        drawer.appendChild(drawerContent);
 
         // Try to insert after the last standard slider
-        // This selector must NOT pick up our own container's contents if we are re-rendering (though we checked ID first)
         const rangeBlocks = Array.from(elements.rangeBlock.querySelectorAll('.range-block'));
         const lastRangeBlock = rangeBlocks.pop();
 
         if (lastRangeBlock) {
-            lastRangeBlock.insertAdjacentElement('afterend', container);
+            lastRangeBlock.insertAdjacentElement('afterend', drawer);
         } else {
             // Fallback: just append to the main block
-            elements.rangeBlock.appendChild(container);
+            elements.rangeBlock.appendChild(drawer);
         }
     }
 
-    // Clear content to ensure clean slate (removes old sliders of different types)
+    // Get/update references
+    const container = document.getElementById(CONTAINER_ID) as HTMLDivElement;
+    const collectionSelect = document.getElementById(COLLECTION_SELECT_ID) as HTMLSelectElement;
+
+    // Populate collection dropdown
+    collectionSelect.innerHTML = '';
+    settings.collections.forEach((collection) => {
+        const option = document.createElement('option');
+        option.value = collection.name;
+        option.textContent = collection.name;
+        option.selected = collection.active;
+        collectionSelect.appendChild(option);
+    });
+
+    // Clear slider container
     container.innerHTML = '';
 
     const activeCollection = settings.collections.find(c => c.active);
