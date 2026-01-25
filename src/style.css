@@ -1,15 +1,270 @@
-#slider_macros_list .textAlignRight {
-    text-align: right;
+/* ============================================
+   SLIDER MACROS - SETTINGS PANEL STYLES
+   ============================================ */
+
+/* --- Toolbar --- */
+.slider_macros_toolbar {
+    margin-bottom: 12px;
 }
 
-#slider_macros_list .empty-message {
+.slider_macros_toolbar_row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.slider_macros_toolbar_row > select {
+    flex: 1;
+    min-width: 0;
+}
+
+.slider_macros_toolbar_actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.slider_macros_toolbar_divider {
+    width: 1px;
+    height: 20px;
+    background: var(--SmartThemeBorderColor, #444);
+    margin: 0 4px;
+}
+
+/* --- Create Button --- */
+.slider_macros_create_row {
+    margin-bottom: 16px;
+}
+
+.slider_macros_btn_create {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 16px;
+    border: 2px dashed var(--SmartThemeBorderColor, #555);
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+.slider_macros_btn_create:hover {
+    border-color: var(--SmartThemeQuoteColor, #888);
+    background: var(--SmartThemeBlurTintColor, rgba(255,255,255,0.03));
+}
+
+/* --- Slider List --- */
+.slider_macros_list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.slider_macros_list .empty-message {
     text-align: center;
-    opacity: 0.8;
+    opacity: 0.6;
     font-size: 0.9em;
+    padding: 24px 16px;
+    border: 1px dashed var(--SmartThemeBorderColor, #444);
+    border-radius: 8px;
 }
 
+/* --- Slider Card --- */
+.slider_macros_card {
+    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.2));
+    border: 1px solid var(--SmartThemeBorderColor, #444);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
 
-/* Ensure custom sliders stack vertically and take full width */
+.slider_macros_card:hover {
+    border-color: var(--SmartThemeQuoteColor, #666);
+}
+
+/* Card Header */
+.slider_macros_card_header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.15));
+    border-bottom: 1px solid var(--SmartThemeBorderColor, #333);
+}
+
+.slider_macros_card_title {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+}
+
+.slider_macros_card_name {
+    font-weight: 600;
+    font-size: 1em;
+    color: var(--SmartThemeBodyColor, #eee);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.slider_macros_card_macro {
+    font-size: 0.8em;
+    color: var(--SmartThemeQuoteColor, #888);
+    font-family: monospace;
+    opacity: 0.8;
+}
+
+.slider_macros_card_macro:not(:empty)::before {
+    content: '{{';
+}
+
+.slider_macros_card_macro:not(:empty)::after {
+    content: '}}';
+}
+
+.slider_macros_card_controls {
+    flex-shrink: 0;
+}
+
+.slider_macros_toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.slider_macros_toggle_label {
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+
+/* Card Body */
+.slider_macros_card_body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.slider_macros_field_group {
+    display: flex;
+    gap: 10px;
+}
+
+.slider_macros_field_group > .slider_macros_field {
+    flex: 1;
+}
+
+.slider_macros_field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.slider_macros_field_row {
+    display: flex;
+    gap: 10px;
+}
+
+.slider_macros_field_compact {
+    flex: 1;
+    min-width: 0;
+}
+
+.slider_macros_field_half {
+    flex: 1;
+    min-width: 0;
+}
+
+.slider_macros_label {
+    font-size: 0.8em;
+    color: var(--SmartThemeQuoteColor, #aaa);
+    font-weight: 500;
+}
+
+.slider_macros_optional {
+    opacity: 0.6;
+    font-weight: 400;
+}
+
+/* Macro Variable Input with decorators */
+.slider_macros_macro_input {
+    display: flex;
+    align-items: center;
+    gap: 0;
+}
+
+.slider_macros_macro_input input {
+    flex: 1;
+    border-radius: 0;
+    text-align: center;
+    font-family: monospace;
+}
+
+.slider_macros_macro_prefix,
+.slider_macros_macro_suffix {
+    padding: 6px 8px;
+    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.3));
+    border: 1px solid var(--SmartThemeBorderColor, #444);
+    font-family: monospace;
+    font-size: 0.9em;
+    color: var(--SmartThemeQuoteColor, #888);
+}
+
+.slider_macros_macro_prefix {
+    border-right: none;
+    border-radius: 4px 0 0 4px;
+}
+
+.slider_macros_macro_suffix {
+    border-left: none;
+    border-radius: 0 4px 4px 0;
+}
+
+/* Type sections */
+.slider_macros_type_section {
+    padding-top: 8px;
+    border-top: 1px dashed var(--SmartThemeBorderColor, #333);
+    margin-top: 4px;
+}
+
+/* Card Footer */
+.slider_macros_card_footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--SmartThemeBlurTintColor, rgba(0,0,0,0.1));
+    border-top: 1px solid var(--SmartThemeBorderColor, #333);
+}
+
+.slider_macros_card_actions_left,
+.slider_macros_card_actions_right {
+    display: flex;
+    gap: 4px;
+}
+
+.slider_macros_btn_subtle {
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.slider_macros_btn_subtle:hover {
+    opacity: 1;
+}
+
+.slider_macros_btn_danger {
+    color: var(--SmartThemeQuoteColor, #888);
+    transition: color 0.2s ease;
+}
+
+.slider_macros_btn_danger:hover {
+    color: #e74c3c;
+}
+
+/* ============================================
+   COMPLETION PANEL SLIDER STYLES
+   ============================================ */
+
 .slider_macros_container .range-block {
     display: flex;
     flex-direction: column;
@@ -26,24 +281,20 @@
 
 .slider_macros_container .range-block-range {
     flex: 1;
-    /* Ha ha, full width fallback because Flex is a pain! */
     width: 100%;
     display: flex;
     align-items: center;
 }
 
 .slider_macros_container .range-block-range input[type="range"] {
-    /* Forcing a width override to combat the inherit demons */
     width: 100% !important;
     margin: 0;
-    /* Add margin to avoid overlap with counter because of NEMO PRESET EXTENSION AAAAAA */
     margin-right: 10px;
     max-width: none;
     flex-grow: 1;
 }
 
 .slider_macros_container .range-block-counter {
-    /* Do not grow, do not shrink, fixed basis, potential problem for mobile later? */
     width: 60px;
     min-width: 60px;
     flex: 0 0 60px;

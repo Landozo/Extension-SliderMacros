@@ -1,87 +1,104 @@
-<div class="flex-container flexFlowColumn flexNoGap">
-    <div class="flex-container justifyContentFlexEnd">
-        <label class="checkbox_label">
-            <input type="checkbox" name="enabled">
-            <small>Enabled</small>
-        </label>
-    </div>
-    <div class="flex-container alignItemsBaseline">
-        <small class="flex1 textAlignRight">Name</small>
-        <input class="flex2 text_pole textarea_compact" type="text" name="name" placeholder="e.g. Macro Slider A">
-    </div>
-    <div class="flex-container alignItemsBaseline">
-        <small class="flex1 textAlignRight">Macro Var</small>
-        <input class="flex2 text_pole textarea_compact" type="text" name="property" placeholder="e.g. macroVarA">
-    </div>
-    <!-- This is the type select, it controls which of the below sections are visible -->
-    <div class="flex-container alignItemsBaseline">
-        <small class="flex1 textAlignRight">Slider Type</small>
-        <select class="flex2 text_pole textarea_compact" name="type">
-            <!-- Numeric is default -->
-            <option value="Numeric" selected>Numeric</option>
-            <option value="Boolean">Boolean</option>
-            <option value="MultiSelect">MultiSelect</option>
-        </select>
-    </div>
-    <!-- These values only show up for Numeric, the default option. They work just like other sliders -->
-    <div class="numeric-only">
-        <div class="flex-container alignItemsBaseline">
-            <small class="flex1 textAlignRight">Min Value</small>
-            <input class="flex2 text_pole textarea_compact" type="text" name="min" placeholder="e.g. 0">
+<div class="slider_macros_card">
+    <div class="slider_macros_card_header">
+        <div class="slider_macros_card_title">
+            <span class="slider_macros_card_name" data-field="name">New Slider</span>
+            <span class="slider_macros_card_macro" data-field="property"></span>
         </div>
-
-        <div class="flex-container alignItemsBaseline">
-            <small class="flex1 textAlignRight">Max Value</small>
-            <input class="flex2 text_pole textarea_compact" type="text" name="max" placeholder="e.g. 1">
-        </div>
-
-        <div class="flex-container alignItemsBaseline">
-            <small class="flex1 textAlignRight">Step</small>
-            <input class="flex2 text_pole textarea_compact" type="text" name="step" placeholder="e.g. 0.01">
+        <div class="slider_macros_card_controls">
+            <label class="checkbox_label slider_macros_toggle">
+                <input type="checkbox" name="enabled">
+                <span class="slider_macros_toggle_label">Active</span>
+            </label>
         </div>
     </div>
-    <!-- These values only show up for Booleans, they will be a dropdown to pass true or false to a var -->
-    <div class="boolean-only">
-        <div class="flex-container alignItemsBaseline">
-            <small class="flex1 textAlignRight">Default Value</small>
-            <select class="flex2 text_pole textarea_compact" name="defaultBoolean">
-                <option value="true">True</option>
-                <option value="false">False</option>
+    <div class="slider_macros_card_body">
+        <div class="slider_macros_field_group">
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Name</label>
+                <input class="text_pole" type="text" name="name" placeholder="e.g. Temperature">
+            </div>
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Macro Variable</label>
+                <div class="slider_macros_macro_input">
+                    <span class="slider_macros_macro_prefix">{{</span>
+                    <input class="text_pole" type="text" name="property" placeholder="myVar">
+                    <span class="slider_macros_macro_suffix">}}</span>
+                </div>
+            </div>
+        </div>
+        <div class="slider_macros_field">
+            <label class="slider_macros_label">Type</label>
+            <select class="text_pole" name="type">
+                <option value="Numeric" selected>Numeric</option>
+                <option value="Boolean">Boolean</option>
+                <option value="MultiSelect">MultiSelect</option>
             </select>
         </div>
+        <!-- Numeric options -->
+        <div class="numeric-only slider_macros_type_section">
+            <div class="slider_macros_field_row">
+                <div class="slider_macros_field slider_macros_field_compact">
+                    <label class="slider_macros_label">Min</label>
+                    <input class="text_pole" type="text" name="min" placeholder="0">
+                </div>
+                <div class="slider_macros_field slider_macros_field_compact">
+                    <label class="slider_macros_label">Max</label>
+                    <input class="text_pole" type="text" name="max" placeholder="1">
+                </div>
+                <div class="slider_macros_field slider_macros_field_compact">
+                    <label class="slider_macros_label">Step</label>
+                    <input class="text_pole" type="text" name="step" placeholder="0.01">
+                </div>
+            </div>
+        </div>
+        <!-- Boolean options -->
+        <div class="boolean-only slider_macros_type_section">
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Default Value</label>
+                <select class="text_pole" name="defaultBoolean">
+                    <option value="true">True</option>
+                    <option value="false">False</option>
+                </select>
+            </div>
+        </div>
+        <!-- MultiSelect options -->
+        <div class="multiselect-only slider_macros_type_section">
+            <div class="slider_macros_field_row">
+                <div class="slider_macros_field slider_macros_field_half">
+                    <label class="slider_macros_label">Option 1</label>
+                    <input class="text_pole" type="text" name="option1" placeholder="e.g. Low">
+                </div>
+                <div class="slider_macros_field slider_macros_field_half">
+                    <label class="slider_macros_label">Option 2</label>
+                    <input class="text_pole" type="text" name="option2" placeholder="e.g. High">
+                </div>
+            </div>
+            <div class="slider_macros_field_row">
+                <div class="slider_macros_field slider_macros_field_half">
+                    <label class="slider_macros_label">Option 3 <span class="slider_macros_optional">(optional)</span></label>
+                    <input class="text_pole" type="text" name="option3" placeholder="">
+                </div>
+                <div class="slider_macros_field slider_macros_field_half">
+                    <label class="slider_macros_label">Option 4 <span class="slider_macros_optional">(optional)</span></label>
+                    <input class="text_pole" type="text" name="option4" placeholder="">
+                </div>
+            </div>
+        </div>
     </div>
-    <!-- These values only show up for Multi-Select, they will allow 2-4 options -->
-    <div class="multiselect-only">
-        <div class="flex-container alignItemsBaseline">
-            <small class="flex1 textAlignRight">Option 1</small>
-            <input class="flex2 text_pole textarea_compact" type="text" name="option1" placeholder="e.g. Red">
+    <div class="slider_macros_card_footer">
+        <div class="slider_macros_card_actions_left">
+            <button class="menu_button menu_button_icon slider_macros_btn_subtle" name="up" type="button" title="Move Up">
+                <i class="fa-solid fa-chevron-up"></i>
+            </button>
+            <button class="menu_button menu_button_icon slider_macros_btn_subtle" name="down" type="button" title="Move Down">
+                <i class="fa-solid fa-chevron-down"></i>
+            </button>
         </div>
-        <div class="flex-container alignItemsBaseline">
-            <small class="flex1 textAlignRight">Option 2</small>
-            <input class="flex2 text_pole textarea_compact" type="text" name="option2" placeholder="e.g. Blue">
+        <div class="slider_macros_card_actions_right">
+            <button class="menu_button menu_button_icon slider_macros_btn_danger" name="delete" type="button" title="Delete Slider">
+                <i class="fa-solid fa-trash-alt"></i>
+                <span>Delete</span>
+            </button>
         </div>
-        <div class="flex-container alignItemsBaseline optional-option">
-            <small class="flex1 textAlignRight">Option 3</small>
-            <input class="flex2 text_pole textarea_compact" type="text" name="option3" placeholder="Optional">
-        </div>
-        <div class="flex-container alignItemsBaseline optional-option">
-            <small class="flex1 textAlignRight">Option 4</small>
-            <input class="flex2 text_pole textarea_compact" type="text" name="option4" placeholder="Optional">
-        </div>
-    </div>
-    <!-- Buttons to move sliders up or down -->
-    <div class="flex-container justifyCenter">
-        <button class="menu_button menu_button_icon" name="up" type="button">
-            <i class="fa-solid fa-chevron-up"></i>
-            <span data-i18n="Move Up">Move Up</span>
-        </button>
-        <button class="menu_button menu_button_icon" name="down" type="button">
-            <i class="fa-solid fa-chevron-down"></i>
-            <span data-i18n="Move Down">Move Down</span>
-        </button>
-        <button class="menu_button menu_button_icon" name="delete" type="button">
-            <i class="fa-solid fa-trash-alt"></i>
-            <span data-i18n="Delete">Delete</span>
-        </button>
     </div>
 </div>

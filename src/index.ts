@@ -341,6 +341,10 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const renderer = document.createElement('template');
         renderer.innerHTML = configTemplate;
 
+        const card = renderer.content.querySelector('.slider_macros_card') as HTMLDivElement;
+        const cardNameDisplay = renderer.content.querySelector('.slider_macros_card_name') as HTMLSpanElement;
+        const cardMacroDisplay = renderer.content.querySelector('.slider_macros_card_macro') as HTMLSpanElement;
+
         const nameInput = renderer.content.querySelector('input[name="name"]') as HTMLInputElement;
         const propertyInput = renderer.content.querySelector('input[name="property"]') as HTMLInputElement;
         const minInput = renderer.content.querySelector('input[name="min"]') as HTMLInputElement;
@@ -357,6 +361,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const booleanOnly = renderer.content.querySelector('.boolean-only') as HTMLElement;
         const multiSelectOnly = renderer.content.querySelector('.multiselect-only') as HTMLElement;
 
+        // Set initial values
         nameInput.value = slider.name;
         propertyInput.value = slider.property;
         minInput.value = slider.min;
@@ -364,6 +369,15 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         stepInput.value = slider.step;
         enableCheckbox.checked = slider.enabled;
         typeSelect.value = slider.type || 'Numeric';
+
+        // Update card header display
+        cardNameDisplay.textContent = slider.name || 'New Slider';
+        cardMacroDisplay.textContent = slider.property || '';
+
+        // Update card visual state based on enabled
+        if (!slider.enabled) {
+            card.style.opacity = '0.6';
+        }
 
         // MultiSelect Inputs
         const optionInputs = [
@@ -412,12 +426,14 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 
         nameInput.addEventListener('input', (e) => {
             slider.name = nameInput.value;
+            cardNameDisplay.textContent = slider.name || 'New Slider';
             debouncedRender();
             debouncedSaveSettings();
         });
 
         propertyInput.addEventListener('input', (e) => {
             slider.property = propertyInput.value;
+            cardMacroDisplay.textContent = slider.property || '';
             debouncedRender();
             debouncedSaveSettings();
         });
@@ -442,6 +458,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 
         enableCheckbox.addEventListener('change', (e) => {
             slider.enabled = enableCheckbox.checked;
+            card.style.opacity = slider.enabled ? '1' : '0.6';
             renderCompletionSliders(settings);
             saveSettingsDebounced();
         });
@@ -490,7 +507,6 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         });
 
         elements.list.appendChild(renderer.content);
-        elements.list.appendChild(document.createElement('hr'));
     });
 
     if (activeCollection.sliders.length === 0) {
