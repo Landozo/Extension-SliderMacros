@@ -511,9 +511,12 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
     const DRAWER_ID = 'slider_macros_drawer';
     const CONTAINER_ID = 'slider_macros_main_container';
     const COLLECTION_SELECT_ID = 'slider_macros_completion_collections';
+    const CONTENT_ID = 'slider_macros_drawer_content';
 
     let drawer = document.getElementById(DRAWER_ID) as HTMLDivElement;
+    let container = document.getElementById(CONTAINER_ID) as HTMLDivElement;
 
+    // Check if we need to create the drawer structure
     if (!drawer) {
         // Create the inline-drawer wrapper
         drawer = document.createElement('div');
@@ -536,6 +539,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
         // Create drawer content
         const drawerContent = document.createElement('div');
+        drawerContent.id = CONTENT_ID;
         drawerContent.className = 'inline-drawer-content';
 
         // Create collection selector row
@@ -563,28 +567,38 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
         drawerContent.appendChild(collectionRow);
 
-        // Create container for sliders
-        const container = document.createElement('div');
-        container.id = CONTAINER_ID;
-        container.className = 'slider_macros_container';
-        drawerContent.appendChild(container);
-
-        drawer.appendChild(drawerContent);
-
-        // Try to insert after the last standard slider
-        const rangeBlocks = Array.from(elements.rangeBlock.querySelectorAll('.range-block'));
-        const lastRangeBlock = rangeBlocks.pop();
-
-        if (lastRangeBlock) {
-            lastRangeBlock.insertAdjacentElement('afterend', drawer);
+        // Check if container already exists (pre-existing), wrap it; otherwise create new
+        if (container) {
+            // Move existing container into drawer content
+            drawerContent.appendChild(container);
+            // Insert drawer where container was
+            container.parentNode?.insertBefore(drawer, container);
+            drawer.appendChild(drawerHeader);
+            drawer.appendChild(drawerContent);
         } else {
-            // Fallback: just append to the main block
-            elements.rangeBlock.appendChild(drawer);
+            // Create new container
+            container = document.createElement('div');
+            container.id = CONTAINER_ID;
+            container.className = 'slider_macros_container';
+            drawerContent.appendChild(container);
+
+            drawer.appendChild(drawerContent);
+
+            // Try to insert after the last standard slider
+            const rangeBlocks = Array.from(elements.rangeBlock.querySelectorAll('.range-block'));
+            const lastRangeBlock = rangeBlocks.pop();
+
+            if (lastRangeBlock) {
+                lastRangeBlock.insertAdjacentElement('afterend', drawer);
+            } else {
+                // Fallback: just append to the main block
+                elements.rangeBlock.appendChild(drawer);
+            }
         }
     }
 
-    // Get/update references
-    const container = document.getElementById(CONTAINER_ID) as HTMLDivElement;
+    // Refresh references after potential DOM changes
+    container = document.getElementById(CONTAINER_ID) as HTMLDivElement;
     const collectionSelect = document.getElementById(COLLECTION_SELECT_ID) as HTMLSelectElement;
 
     // Populate collection dropdown
