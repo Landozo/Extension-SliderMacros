@@ -110,6 +110,7 @@ function getUIElements() {
     return {
         create: document.getElementById('slider_macros_create') as HTMLInputElement,
         list: document.getElementById('slider_macros_list') as HTMLDivElement,
+        rangeBlock: document.getElementById('range_block_openai') as HTMLDivElement,
         collections: document.getElementById('slider_macros_collections') as HTMLSelectElement,
         createCollection: document.getElementById('slider_macros_create_collection') as HTMLDivElement,
         deleteCollection: document.getElementById('slider_macros_delete_collection') as HTMLDivElement,
@@ -597,24 +598,34 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
         drawerContent.appendChild(collectionRow);
 
-        // Create new container
-        container = document.createElement('div');
-        container.id = CONTAINER_ID;
-        container.className = 'slider_macros_container';
-        drawerContent.appendChild(container);
+        // Check if container already exists (pre-existing), wrap it; otherwise create new
+        if (container) {
+            // Move existing container into drawer content
+            drawerContent.appendChild(container);
+            // Insert drawer where container was
+            container.parentNode?.insertBefore(drawer, container);
+            drawer.appendChild(drawerHeader);
+            drawer.appendChild(drawerContent);
+        } else {
+            // Create new container
+            container = document.createElement('div');
+            container.id = CONTAINER_ID;
+            container.className = 'slider_macros_container';
+            drawerContent.appendChild(container);
 
-        drawer.appendChild(drawerContent);
-    }
+            drawer.appendChild(drawerContent);
 
-    // Always try to attach to the correct parent if available, even if drawer exists
-    const completionPromptManager = document.getElementById('completion_prompt_manager');
-    if (completionPromptManager) {
-        if (drawer.parentElement !== completionPromptManager || completionPromptManager.firstChild !== drawer) {
-            completionPromptManager.insertBefore(drawer, completionPromptManager.firstChild);
+            // Try to insert after the last standard slider
+            const rangeBlocks = Array.from(elements.rangeBlock.querySelectorAll('.range-block'));
+            const lastRangeBlock = rangeBlocks.pop();
+
+            if (lastRangeBlock) {
+                lastRangeBlock.insertAdjacentElement('afterend', drawer);
+            } else {
+                // Fallback: just append to the main block
+                elements.rangeBlock.appendChild(drawer);
+            }
         }
-    } else {
-        // If the target container doesn't exist yet, we don't attach the drawer. 
-        // The MutationObserver will call this again when it appears.
     }
 
     // Refresh references after potential DOM changes
@@ -647,6 +658,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
         renderer.innerHTML = sliderTemplate;
 
         const sliderId = CSS.escape('slider_macro_' + slider.property);
+        const rangeBlock = renderer.content.querySelector('.range-block') as HTMLDivElement;
         const titleElement = renderer.content.querySelector('.range-block-title') as HTMLSpanElement;
 
         const existingSlider = document.getElementById(sliderId);
@@ -893,30 +905,16 @@ function setupEventHandlers(settings: ExtensionSettings): void {
 
             saveSettingsDebounced();
             renderSliderConfigs(settings);
-        }
-        // Re-render the completions sliders to reflect the new collection or restore valid UI
-        setTimeout(() => {
+            // Re-render the completions sliders to reflect the new collection
             renderCompletionSliders(settings);
-        }, 500);
+        }
     });
 }
-// Mutation observer for the oddities of the Sillytavern DOM redraws on preset switching. As usual, Prolix knew the magic word.
-const observer = new MutationObserver(debounce(() => {
-    const settings = getSettings();
-    const target = document.getElementById('completion_prompt_manager');
-    const drawer = document.getElementById('slider_macros_drawer');
-
-    // If target exists but drawer is missing or displaced, re-render/move it.
-    if (target && (!drawer || drawer.parentElement !== target)) {
-        renderCompletionSliders(settings);
-    }
-}, 500));
 
 (async function init() {
     const settings = getSettings();
     addSettingsControls(settings);
-    renderCompletionSliders(settings);
+    renderSliderConfigs(settings);
     setupEventHandlers(settings);
-    observer.observe(document.body, { childList: true, subtree: true });
     saveSettingsDebounced();
 })();

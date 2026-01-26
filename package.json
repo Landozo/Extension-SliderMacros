@@ -1,7 +1,7 @@
 {
   "name": "extension-slider-macros",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "private": true,
   "scripts": {
     "build": "webpack --mode production",

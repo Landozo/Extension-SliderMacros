@@ -5,8 +5,8 @@
     "optional": [],
     "js": "dist/index.js",
     "css": "",
-    "author": "Landozo",
-    "version": "0.1.0",
+    "author": "Landozo and Prolix",
+    "version": "0.1.5",
     "homePage": "https://github.com/Landozo/Extension-SliderMacros",
-    "auto_update": false
+    "auto_update": true
 }
