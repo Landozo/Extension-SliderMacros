@@ -402,7 +402,9 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
     });
     const presetName = chatCompletionSettings.preset_settings_openai;
     elements.bindToPreset.classList.toggle('toggleEnabled', activeCollection.presets.includes(presetName));
-    activeCollection.sliders.forEach((slider, index) => {
+
+    // Helper function to create a slider card element
+    const createSliderCard = (slider: SliderModel, index: number): DocumentFragment => {
         const renderer = document.createElement('template');
         renderer.innerHTML = configTemplate;
 
@@ -482,20 +484,11 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         cardMacroDisplay.textContent = slider.property || '';
         cardTypeBadge.textContent = slider.type || 'Numeric';
 
-        // Update group badge display
-        const updateGroupBadge = () => {
-            if (cardGroupBadge && cardGroupName) {
-                const assignedGroup = activeCollection.groups.find(g => g.id === slider.groupId);
-                if (assignedGroup) {
-                    cardGroupBadge.dataset.visible = 'true';
-                    cardGroupName.textContent = assignedGroup.name;
-                } else {
-                    cardGroupBadge.dataset.visible = 'false';
-                    cardGroupName.textContent = '';
-                }
-            }
-        };
-        updateGroupBadge();
+        // Hide group badge for grouped sliders (they're already inside the group)
+        // Show it only for ungrouped sliders that were previously in a group
+        if (cardGroupBadge) {
+            cardGroupBadge.dataset.visible = 'false';
+        }
 
         // Update card visual state based on enabled
         if (!slider.enabled) {
@@ -669,49 +662,48 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             renderCompletionSliders(settings);
         });
 
-        // Event listener for group change
+        // Event listener for group change - re-render entire settings panel to move slider
         if (groupIdSelect) {
             groupIdSelect.addEventListener('change', () => {
                 slider.groupId = groupIdSelect.value || null;
-                updateGroupBadge();
                 saveSettingsDebounced();
-                renderCompletionSliders(settings);
+                renderSliderConfigs(settings);
             });
         }
 
-        nameInput.addEventListener('input', (e) => {
+        nameInput.addEventListener('input', () => {
             slider.name = nameInput.value;
             cardNameDisplay.textContent = slider.name || 'New Slider';
             debouncedRender();
             debouncedSaveSettings();
         });
 
-        propertyInput.addEventListener('input', (e) => {
+        propertyInput.addEventListener('input', () => {
             slider.property = propertyInput.value;
             cardMacroDisplay.textContent = slider.property || '';
             debouncedRender();
             debouncedSaveSettings();
         });
 
-        minInput.addEventListener('input', (e) => {
+        minInput.addEventListener('input', () => {
             slider.min = minInput.value;
             debouncedRender();
             debouncedSaveSettings();
         });
 
-        maxInput.addEventListener('input', (e) => {
+        maxInput.addEventListener('input', () => {
             slider.max = maxInput.value;
             debouncedRender();
             debouncedSaveSettings();
         });
 
-        stepInput.addEventListener('input', (e) => {
+        stepInput.addEventListener('input', () => {
             slider.step = stepInput.value;
             debouncedRender();
             debouncedSaveSettings();
         });
 
-        enableCheckbox.addEventListener('change', (e) => {
+        enableCheckbox.addEventListener('change', () => {
             slider.enabled = enableCheckbox.checked;
             card.dataset.disabled = slider.enabled ? 'false' : 'true';
             renderCompletionSliders(settings);
@@ -761,10 +753,10 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             }
         });
 
-        elements.list.appendChild(renderer.content);
-    });
+        return renderer.content;
+    };
 
-    // Render groups
+    // Render groups first (with their sliders nested inside)
     activeCollection.groups.forEach((group, groupIndex) => {
         const renderer = document.createElement('template');
         renderer.innerHTML = groupTemplate;
@@ -773,20 +765,29 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const cardHeader = renderer.content.querySelector('.slider_macros_group_card_header') as HTMLDivElement;
         const cardNameDisplay = renderer.content.querySelector('.slider_macros_group_card_name') as HTMLSpanElement;
         const cardCountDisplay = renderer.content.querySelector('.slider_macros_group_card_count') as HTMLSpanElement;
+        const groupSlidersContainer = renderer.content.querySelector('.slider_macros_group_sliders') as HTMLDivElement;
 
         const nameInput = renderer.content.querySelector('input[name="groupName"]') as HTMLInputElement;
         const deleteButton = renderer.content.querySelector('button[name="deleteGroup"]') as HTMLButtonElement;
         const upButton = renderer.content.querySelector('button[name="up"]') as HTMLButtonElement;
         const downButton = renderer.content.querySelector('button[name="down"]') as HTMLButtonElement;
 
-        // Count sliders in this group
-        const slidersInGroup = activeCollection.sliders.filter(s => s.groupId === group.id).length;
+        // Get sliders in this group
+        const slidersInGroup = activeCollection.sliders
+            .map((s, i) => ({ slider: s, index: i }))
+            .filter(item => item.slider.groupId === group.id);
 
         // Set initial values
         card.dataset.groupId = group.id;
         cardNameDisplay.textContent = group.name || 'New Group';
-        cardCountDisplay.textContent = `(${slidersInGroup} slider${slidersInGroup !== 1 ? 's' : ''})`;
+        cardCountDisplay.textContent = `(${slidersInGroup.length} slider${slidersInGroup.length !== 1 ? 's' : ''})`;
         nameInput.value = group.name;
+
+        // Render sliders inside the group
+        slidersInGroup.forEach(({ slider, index }) => {
+            const sliderCard = createSliderCard(slider, index);
+            groupSlidersContainer.appendChild(sliderCard);
+        });
 
         // Expand/collapse toggle
         cardHeader.addEventListener('click', (e) => {
@@ -823,7 +824,8 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         });
 
         // Move up
-        upButton.addEventListener('click', () => {
+        upButton.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (groupIndex > 0) {
                 const temp = activeCollection.groups[groupIndex - 1];
                 activeCollection.groups[groupIndex - 1] = activeCollection.groups[groupIndex];
@@ -834,7 +836,8 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         });
 
         // Move down
-        downButton.addEventListener('click', () => {
+        downButton.addEventListener('click', (e) => {
+            e.stopPropagation();
             if (groupIndex < activeCollection.groups.length - 1) {
                 const temp = activeCollection.groups[groupIndex + 1];
                 activeCollection.groups[groupIndex + 1] = activeCollection.groups[groupIndex];
@@ -845,6 +848,16 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         });
 
         elements.list.appendChild(renderer.content);
+    });
+
+    // Render ungrouped sliders after groups
+    const ungroupedSliders = activeCollection.sliders
+        .map((s, i) => ({ slider: s, index: i }))
+        .filter(item => !item.slider.groupId);
+
+    ungroupedSliders.forEach(({ slider, index }) => {
+        const sliderCard = createSliderCard(slider, index);
+        elements.list.appendChild(sliderCard);
     });
 
     if (activeCollection.sliders.length === 0 && activeCollection.groups.length === 0) {
