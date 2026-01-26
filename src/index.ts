@@ -187,28 +187,21 @@ function searchMacros(query: string, limit = 20): MacroInfo[] {
  */
 async function showMacroSearchPopup(): Promise<MacroInfo | null> {
     return new Promise((resolve) => {
-        // Build the search UI
-        const container = document.createElement('div');
-        container.className = 'slider_macros_search_container';
-
-        const inputRow = document.createElement('div');
-        inputRow.className = 'slider_macros_search_input_row';
-
-        const searchInput = document.createElement('input');
-        searchInput.type = 'text';
-        searchInput.className = 'text_pole';
-        searchInput.placeholder = 'Search macros by name or description...';
-        inputRow.appendChild(searchInput);
-
-        container.appendChild(inputRow);
-
-        const resultsContainer = document.createElement('div');
-        resultsContainer.className = 'slider_macros_search_results';
-        container.appendChild(resultsContainer);
-
         let selectedMacro: MacroInfo | null = null;
 
-        const renderResults = (query: string) => {
+        // Build initial HTML
+        const initialHtml = `
+            <div class="slider_macros_search_container">
+                <div class="slider_macros_search_input_row">
+                    <input type="text" class="text_pole slider_macros_search_input" placeholder="Search macros by name or description...">
+                </div>
+                <div class="slider_macros_search_results">
+                    <div class="slider_macros_search_empty">Loading macros...</div>
+                </div>
+            </div>
+        `;
+
+        const renderResults = (query: string, resultsContainer: HTMLElement) => {
             const results = searchMacros(query, 50);
             resultsContainer.innerHTML = '';
 
@@ -269,20 +262,8 @@ async function showMacroSearchPopup(): Promise<MacroInfo | null> {
             });
         };
 
-        // Initial render
-        renderResults('');
-
-        // Debounced search
-        let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-        searchInput.addEventListener('input', () => {
-            if (searchTimeout) clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                renderResults(searchInput.value);
-            }, 150);
-        });
-
         // Show popup
-        Popup.show.confirm('Search Existing Macros', container, {
+        Popup.show.confirm('Search Existing Macros', initialHtml, {
             okButton: 'Select',
             cancelButton: 'Cancel',
         }).then((confirmed: boolean) => {
@@ -293,8 +274,28 @@ async function showMacroSearchPopup(): Promise<MacroInfo | null> {
             }
         });
 
-        // Focus search input after popup opens
-        setTimeout(() => searchInput.focus(), 100);
+        // After popup opens, attach event listeners
+        setTimeout(() => {
+            const searchInput = document.querySelector('.slider_macros_search_input') as HTMLInputElement;
+            const resultsContainer = document.querySelector('.slider_macros_search_results') as HTMLDivElement;
+
+            if (searchInput && resultsContainer) {
+                // Initial render
+                renderResults('', resultsContainer);
+
+                // Debounced search
+                let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+                searchInput.addEventListener('input', () => {
+                    if (searchTimeout) clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        renderResults(searchInput.value, resultsContainer);
+                    }, 150);
+                });
+
+                // Focus search input
+                searchInput.focus();
+            }
+        }, 50);
     });
 }
 
