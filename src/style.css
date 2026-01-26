@@ -38,18 +38,24 @@
     margin: 0 4px;
 }
 
-/* --- Create Button --- */
+/* --- Create Buttons --- */
 .slider_macros_create_row {
+    display: flex;
+    gap: 8px;
     margin-bottom: 16px;
 }
 
 .slider_macros_btn_create {
-    width: 100%;
+    flex: 1;
     justify-content: center;
     padding: 10px 16px;
     border: 2px dashed var(--SmartThemeBorderColor, #555);
     background: transparent;
     transition: all 0.2s ease;
+}
+
+.slider_macros_btn_create_group {
+    border-color: var(--SmartThemeQuoteColor, #666);
 }
 
 .slider_macros_btn_create:hover {
@@ -490,4 +496,148 @@
 .slider_macros_checkbox_text {
     font-weight: 500;
     color: var(--SmartThemeBodyColor, #eee);
+}
+
+/* ============================================
+   SETTINGS PANEL - GROUP CARDS
+   ============================================ */
+
+.slider_macros_group_card {
+    background: var(--SmartThemeChatTintColor, rgba(20,20,30,0.95));
+    border: 2px solid var(--SmartThemeQuoteColor, #666);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.slider_macros_group_card:hover {
+    border-color: var(--SmartThemeBodyColor, #888);
+}
+
+.slider_macros_group_card_header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.05);
+    cursor: pointer;
+    user-select: none;
+}
+
+.slider_macros_group_card_header:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.slider_macros_group_card_summary {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.slider_macros_group_icon {
+    color: var(--SmartThemeQuoteColor, #888);
+    font-size: 1em;
+}
+
+.slider_macros_group_card_name {
+    font-weight: 600;
+    font-size: 1em;
+    color: var(--SmartThemeBodyColor, #eee);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.slider_macros_group_card_count {
+    font-size: 0.85em;
+    color: var(--SmartThemeQuoteColor, #888);
+    white-space: nowrap;
+}
+
+.slider_macros_group_card[data-expanded="true"] .slider_macros_card_chevron {
+    transform: rotate(90deg);
+}
+
+.slider_macros_group_card_body {
+    display: none;
+    padding: 12px;
+    border-top: 1px solid var(--SmartThemeBorderColor, #333);
+    background: rgba(0,0,0,0.15);
+}
+
+.slider_macros_group_card[data-expanded="true"] .slider_macros_group_card_body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.slider_macros_group_sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+/* ============================================
+   COMPLETION PANEL - COLLAPSIBLE GROUPS
+   ============================================ */
+
+.slider_macros_group {
+    border: 1px solid var(--SmartThemeBorderColor, #444);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    background: rgba(0,0,0,0.1);
+}
+
+.slider_macros_group_header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.03);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s ease;
+}
+
+.slider_macros_group_header:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+.slider_macros_group_chevron {
+    font-size: 0.85em;
+    color: var(--SmartThemeQuoteColor, #888);
+    transition: transform 0.2s ease;
+}
+
+.slider_macros_group[data-collapsed="true"] .slider_macros_group_chevron {
+    transform: rotate(-90deg);
+}
+
+.slider_macros_group_name {
+    font-weight: 600;
+    font-size: 0.95em;
+    color: var(--SmartThemeBodyColor, #eee);
+    flex: 1;
+}
+
+.slider_macros_group_count {
+    font-size: 0.8em;
+    color: var(--SmartThemeQuoteColor, #888);
+}
+
+.slider_macros_group_content {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid var(--SmartThemeBorderColor, #333);
+}
+
+.slider_macros_group[data-collapsed="true"] .slider_macros_group_content {
+    display: none;
 }

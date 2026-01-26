@@ -5,6 +5,7 @@ import './style.css';
 import settingsTemplate from './settings.html';
 import configTemplate from './config.html';
 import sliderTemplate from './slider.html';
+import groupTemplate from './group.html';
 // import { macros, MacroCategory } from '../../../../macros/macro-system.js';
 // import { MacrosParser } from '../../../../macros.js';
 // import { MacroCategory } from '../../../../macros/engine/MacroRegistry';
@@ -59,6 +60,13 @@ interface SliderModel {
     // Checkbox type fields
     checkboxTrueValue: string;
     checkboxFalseValue: string;
+    groupId: string | null;
+}
+
+interface SliderGroup {
+    id: string;
+    name: string;
+    collapsed: boolean;
 }
 
 interface SliderCollection {
@@ -66,6 +74,7 @@ interface SliderCollection {
     name: string;
     sliders: SliderModel[];
     presets: string[];
+    groups: SliderGroup[];
 }
 
 interface ExtensionSettings {
@@ -84,8 +93,13 @@ const defaultSettings: Readonly<ExtensionSettings> = Object.freeze({
         name: 'Default',
         sliders: [],
         presets: [],
+        groups: [],
     }],
 });
+
+function generateGroupId(): string {
+    return 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+}
 
 export function getSettings(): ExtensionSettings {
     const context = SillyTavern.getContext();
@@ -115,12 +129,26 @@ export function getSettings(): ExtensionSettings {
         settings.collections[0].active = true;
     }
 
+    // Migration: Add groups array to collections that don't have it
+    for (const collection of settings.collections) {
+        if (!collection.groups) {
+            collection.groups = [];
+        }
+        // Migration: Add groupId to sliders that don't have it
+        for (const slider of collection.sliders) {
+            if (slider.groupId === undefined) {
+                slider.groupId = null;
+            }
+        }
+    }
+
     return settings;
 }
 
 function getUIElements() {
     return {
         create: document.getElementById('slider_macros_create') as HTMLInputElement,
+        createGroup: document.getElementById('slider_macros_create_group') as HTMLDivElement,
         list: document.getElementById('slider_macros_list') as HTMLDivElement,
         collections: document.getElementById('slider_macros_collections') as HTMLSelectElement,
         createCollection: document.getElementById('slider_macros_create_collection') as HTMLDivElement,
@@ -146,6 +174,7 @@ export function addSettingsControls(settings: ExtensionSettings): void {
 
     const elements = getUIElements();
     elements.create.addEventListener('click', createSlider);
+    elements.createGroup.addEventListener('click', createGroup);
     elements.createCollection.addEventListener('click', createCollection);
     elements.deleteCollection.addEventListener('click', deleteCollection);
     elements.bindToPreset.addEventListener('click', bindToPreset);
@@ -199,6 +228,9 @@ export function addSettingsControls(settings: ExtensionSettings): void {
         reader.readAsText(file);
         elements.importFile.value = '';
     });
+
+    // Initial render of slider configs
+    renderSliderConfigs(settings);
 }
 
 async function processImport(fileName: string, parsedSliders: SliderModel[], settings: ExtensionSettings): Promise<void> {
@@ -326,8 +358,26 @@ function createSlider(): void {
         colorFormat: 'hex',
         checkboxTrueValue: 'true',
         checkboxFalseValue: 'false',
+        groupId: null,
     });
 
+    renderSliderConfigs(settings);
+}
+
+// This function is used to create a new group from the settings panel.
+function createGroup(): void {
+    const settings = getSettings();
+    const activeCollection = settings.collections.find(c => c.active);
+    if (!activeCollection) {
+        return;
+    }
+    activeCollection.groups.push({
+        id: generateGroupId(),
+        name: 'New Group',
+        collapsed: false,
+    });
+
+    saveSettingsDebounced();
     renderSliderConfigs(settings);
 }
 
@@ -369,6 +419,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const stepInput = renderer.content.querySelector('input[name="step"]') as HTMLInputElement;
         const enableCheckbox = renderer.content.querySelector('input[name="enabled"]') as HTMLInputElement;
         const typeSelect = renderer.content.querySelector('select[name="type"]') as HTMLSelectElement;
+        const groupIdSelect = renderer.content.querySelector('select[name="groupId"]') as HTMLSelectElement;
 
         const deleteButton = renderer.content.querySelector('button[name="delete"]') as HTMLButtonElement;
         const upButton = renderer.content.querySelector('button[name="up"]') as HTMLButtonElement;
@@ -411,6 +462,18 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         if (checkboxTrueValueInput) checkboxTrueValueInput.value = slider.checkboxTrueValue;
         if (checkboxFalseValueInput) checkboxFalseValueInput.value = slider.checkboxFalseValue;
         if (defaultCheckboxSelect) defaultCheckboxSelect.value = slider.value === true ? 'true' : 'false';
+
+        // Populate group selector
+        if (groupIdSelect) {
+            groupIdSelect.innerHTML = '<option value="">No Group</option>';
+            activeCollection.groups.forEach((group) => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                option.selected = slider.groupId === group.id;
+                groupIdSelect.appendChild(option);
+            });
+        }
 
         // Update card header display
         cardNameDisplay.textContent = slider.name || 'New Slider';
@@ -589,6 +652,15 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             renderCompletionSliders(settings);
         });
 
+        // Event listener for group change
+        if (groupIdSelect) {
+            groupIdSelect.addEventListener('change', () => {
+                slider.groupId = groupIdSelect.value || null;
+                saveSettingsDebounced();
+                renderCompletionSliders(settings);
+            });
+        }
+
         nameInput.addEventListener('input', (e) => {
             slider.name = nameInput.value;
             cardNameDisplay.textContent = slider.name || 'New Slider';
@@ -674,10 +746,93 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         elements.list.appendChild(renderer.content);
     });
 
-    if (activeCollection.sliders.length === 0) {
+    // Render groups
+    activeCollection.groups.forEach((group, groupIndex) => {
+        const renderer = document.createElement('template');
+        renderer.innerHTML = groupTemplate;
+
+        const card = renderer.content.querySelector('.slider_macros_group_card') as HTMLDivElement;
+        const cardHeader = renderer.content.querySelector('.slider_macros_group_card_header') as HTMLDivElement;
+        const cardNameDisplay = renderer.content.querySelector('.slider_macros_group_card_name') as HTMLSpanElement;
+        const cardCountDisplay = renderer.content.querySelector('.slider_macros_group_card_count') as HTMLSpanElement;
+
+        const nameInput = renderer.content.querySelector('input[name="groupName"]') as HTMLInputElement;
+        const deleteButton = renderer.content.querySelector('button[name="deleteGroup"]') as HTMLButtonElement;
+        const upButton = renderer.content.querySelector('button[name="up"]') as HTMLButtonElement;
+        const downButton = renderer.content.querySelector('button[name="down"]') as HTMLButtonElement;
+
+        // Count sliders in this group
+        const slidersInGroup = activeCollection.sliders.filter(s => s.groupId === group.id).length;
+
+        // Set initial values
+        card.dataset.groupId = group.id;
+        cardNameDisplay.textContent = group.name || 'New Group';
+        cardCountDisplay.textContent = `(${slidersInGroup} slider${slidersInGroup !== 1 ? 's' : ''})`;
+        nameInput.value = group.name;
+
+        // Expand/collapse toggle
+        cardHeader.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('.slider_macros_card_controls')) {
+                return;
+            }
+            const isExpanded = card.dataset.expanded === 'true';
+            card.dataset.expanded = isExpanded ? 'false' : 'true';
+        });
+
+        // Name change
+        nameInput.addEventListener('input', () => {
+            group.name = nameInput.value;
+            cardNameDisplay.textContent = group.name || 'New Group';
+            debouncedSaveSettings();
+        });
+
+        // Delete group
+        deleteButton.addEventListener('click', async () => {
+            const confirm = await Popup.show.confirm('Delete Group', `Are you sure you want to delete the group "${group.name}"? Sliders in this group will become ungrouped.`);
+            if (!confirm) {
+                return;
+            }
+            // Ungroup all sliders in this group
+            activeCollection.sliders.forEach(s => {
+                if (s.groupId === group.id) {
+                    s.groupId = null;
+                }
+            });
+            activeCollection.groups.splice(groupIndex, 1);
+            renderSliderConfigs(settings);
+            saveSettingsDebounced();
+        });
+
+        // Move up
+        upButton.addEventListener('click', () => {
+            if (groupIndex > 0) {
+                const temp = activeCollection.groups[groupIndex - 1];
+                activeCollection.groups[groupIndex - 1] = activeCollection.groups[groupIndex];
+                activeCollection.groups[groupIndex] = temp;
+                renderSliderConfigs(settings);
+                saveSettingsDebounced();
+            }
+        });
+
+        // Move down
+        downButton.addEventListener('click', () => {
+            if (groupIndex < activeCollection.groups.length - 1) {
+                const temp = activeCollection.groups[groupIndex + 1];
+                activeCollection.groups[groupIndex + 1] = activeCollection.groups[groupIndex];
+                activeCollection.groups[groupIndex] = temp;
+                renderSliderConfigs(settings);
+                saveSettingsDebounced();
+            }
+        });
+
+        elements.list.appendChild(renderer.content);
+    });
+
+    if (activeCollection.sliders.length === 0 && activeCollection.groups.length === 0) {
         const emptyMessage = document.createElement('div');
         emptyMessage.classList.add('empty-message');
-        emptyMessage.textContent = 'No custom sliders. Click "Create" to add one.';
+        emptyMessage.textContent = 'No custom sliders or groups. Click "Create Slider" or "Create Group" to add one.';
         elements.list.appendChild(emptyMessage);
     }
 
@@ -789,7 +944,9 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
     if (!activeCollection) {
         return;
     }
-    activeCollection.sliders.forEach((slider) => {
+
+    // Helper function to render a single slider to a target container
+    const renderSliderToContainer = (slider: SliderModel, targetContainer: HTMLElement) => {
         if (!slider.enabled || !slider.property || !slider.name) {
             return;
         }
@@ -1104,7 +1261,67 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
             }
         }
 
-        container.appendChild(renderer.content);
+        targetContainer.appendChild(renderer.content);
+    };
+
+    // Render ungrouped sliders first
+    const ungroupedSliders = activeCollection.sliders.filter(s => !s.groupId);
+    ungroupedSliders.forEach(slider => renderSliderToContainer(slider, container));
+
+    // Render groups with their sliders
+    activeCollection.groups.forEach((group) => {
+        const slidersInGroup = activeCollection.sliders.filter(s => s.groupId === group.id);
+
+        // Skip empty groups in the completion panel
+        if (slidersInGroup.filter(s => s.enabled && s.property && s.name).length === 0) {
+            return;
+        }
+
+        // Create group container
+        const groupContainer = document.createElement('div');
+        groupContainer.className = 'slider_macros_group';
+        groupContainer.dataset.groupId = group.id;
+        groupContainer.dataset.collapsed = group.collapsed ? 'true' : 'false';
+
+        // Create group header
+        const groupHeader = document.createElement('div');
+        groupHeader.className = 'slider_macros_group_header';
+
+        const groupChevron = document.createElement('i');
+        groupChevron.className = 'fa-solid fa-chevron-down slider_macros_group_chevron';
+
+        const groupName = document.createElement('span');
+        groupName.className = 'slider_macros_group_name';
+        groupName.textContent = group.name;
+
+        const groupCount = document.createElement('span');
+        groupCount.className = 'slider_macros_group_count';
+        const enabledCount = slidersInGroup.filter(s => s.enabled && s.property && s.name).length;
+        groupCount.textContent = `(${enabledCount})`;
+
+        groupHeader.appendChild(groupChevron);
+        groupHeader.appendChild(groupName);
+        groupHeader.appendChild(groupCount);
+
+        // Toggle collapse on header click
+        groupHeader.addEventListener('click', () => {
+            const isCollapsed = groupContainer.dataset.collapsed === 'true';
+            groupContainer.dataset.collapsed = isCollapsed ? 'false' : 'true';
+            group.collapsed = !isCollapsed;
+            saveSettingsDebounced();
+        });
+
+        groupContainer.appendChild(groupHeader);
+
+        // Create group content
+        const groupContent = document.createElement('div');
+        groupContent.className = 'slider_macros_group_content';
+
+        // Render sliders into group content
+        slidersInGroup.forEach(slider => renderSliderToContainer(slider, groupContent));
+
+        groupContainer.appendChild(groupContent);
+        container.appendChild(groupContainer);
     });
 
     // Update the macros based on the current settings (initial load)
