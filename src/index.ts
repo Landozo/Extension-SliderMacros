@@ -10,7 +10,7 @@ import groupTemplate from './group.html';
 // import { MacrosParser } from '../../../../macros.js';
 // import { MacroCategory } from '../../../../macros/engine/MacroRegistry';
 
-const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser, substituteParams, variables } = (SillyTavern.getContext() as any);
+const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser, substituteParams, variables, resolveVariable } = (SillyTavern.getContext() as any);
 
 const MODULE_NAME = 'sliderMacros';
 const DEBOUNCE_DELAY = 300;
@@ -561,10 +561,10 @@ function setVariableValue(name: string, value: unknown, scope: 'local' | 'global
 }
 
 /**
- * Checks if a variable exists.
+ * Checks if a variable exists in a specific scope.
  * @param name - Variable name
  * @param scope - 'local' or 'global' (default: 'local')
- * @returns True if the variable exists
+ * @returns True if the variable exists in the specified scope
  */
 function hasVariable(name: string, scope: 'local' | 'global' = 'local'): boolean {
     if (!variables) return false;
@@ -578,6 +578,33 @@ function hasVariable(name: string, scope: 'local' | 'global' = 'local'): boolean
         console.warn(`[SliderMacros] Failed to check variable "${name}":`, e);
     }
     return false;
+}
+
+/**
+ * Checks if a variable exists in any scope (local first, then global).
+ * Uses resolveVariable from ST which returns the name itself if not found.
+ * @param name - Variable name
+ * @returns Object with exists flag and the scope where it was found
+ */
+function findVariable(name: string): { exists: boolean; scope: 'local' | 'global' | null; value: unknown } {
+    // Check local first
+    if (hasVariable(name, 'local')) {
+        return { exists: true, scope: 'local', value: getVariableValue(name, 'local') };
+    }
+    // Check global
+    if (hasVariable(name, 'global')) {
+        return { exists: true, scope: 'global', value: getVariableValue(name, 'global') };
+    }
+    // Fallback: use resolveVariable if available (checks scope → local → global)
+    if (typeof resolveVariable === 'function') {
+        const resolved = resolveVariable(name);
+        // resolveVariable returns the name itself if not found
+        if (resolved !== name) {
+            // Variable exists but we don't know which scope - check both again
+            return { exists: true, scope: null, value: resolved };
+        }
+    }
+    return { exists: false, scope: null, value: undefined };
 }
 
 /**
@@ -639,16 +666,26 @@ function setVariableFromTemplate(varName: string, template: string, scope: 'loca
 
 /**
  * Syncs a slider's value to its bound variable if syncVariable is set.
+ * Only syncs to EXISTING variables - will not create new ones.
  * @param slider - The slider model to sync
+ * @returns True if sync was successful, false if variable doesn't exist
  */
-function syncSliderToVariable(slider: SliderModel): void {
+function syncSliderToVariable(slider: SliderModel): boolean {
     if (!slider.syncVariable) {
-        return;
+        return false;
     }
 
     const scope = slider.syncScope || 'local';
+
+    // Only sync to existing variables
+    if (!hasVariable(slider.syncVariable, scope)) {
+        console.debug(`[SliderMacros] Skipping sync - variable "${slider.syncVariable}" does not exist in ${scope} scope`);
+        return false;
+    }
+
     setVariableValue(slider.syncVariable, slider.value, scope);
     console.debug(`[SliderMacros] Synced slider "${slider.name}" value to ${scope} variable "${slider.syncVariable}":`, slider.value);
+    return true;
 }
 
 // ============================================================================
@@ -1450,11 +1487,18 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             if (hasVariable(varName, scope)) {
                 const currentValue = getVariableValue(varName, scope);
                 const displayValue = String(currentValue).length > 30 ? String(currentValue).substring(0, 30) + '...' : String(currentValue);
-                variableStatusElement.textContent = `Variable exists (current: ${displayValue})`;
+                variableStatusElement.textContent = `✓ Variable exists (current: ${displayValue})`;
                 variableStatusElement.className = 'slider_macros_variable_status found';
             } else {
-                variableStatusElement.textContent = 'Variable will be created on first slider change';
-                variableStatusElement.className = 'slider_macros_variable_status available';
+                // Check if it exists in the other scope
+                const otherScope = scope === 'local' ? 'global' : 'local';
+                if (hasVariable(varName, otherScope)) {
+                    variableStatusElement.textContent = `⚠ Variable exists in ${otherScope} scope, not ${scope}`;
+                    variableStatusElement.className = 'slider_macros_variable_status not-found';
+                } else {
+                    variableStatusElement.textContent = '✗ Variable does not exist - sync will be skipped';
+                    variableStatusElement.className = 'slider_macros_variable_status not-found';
+                }
             }
         };
 
