@@ -61,12 +61,14 @@ interface SliderModel {
     checkboxTrueValue: string;
     checkboxFalseValue: string;
     groupId: string | null;
+    order: number;
 }
 
 interface SliderGroup {
     id: string;
     name: string;
     collapsed: boolean;
+    order: number;
 }
 
 interface SliderCollection {
@@ -99,6 +101,13 @@ const defaultSettings: Readonly<ExtensionSettings> = Object.freeze({
 
 function generateGroupId(): string {
     return 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+}
+
+function getNextOrder(collection: SliderCollection): number {
+    const groupOrders = collection.groups.map(g => g.order);
+    const ungroupedSliderOrders = collection.sliders.filter(s => !s.groupId).map(s => s.order);
+    const allOrders = [...groupOrders, ...ungroupedSliderOrders];
+    return allOrders.length > 0 ? Math.max(...allOrders) + 1 : 0;
 }
 
 export function getSettings(): ExtensionSettings {
@@ -134,10 +143,28 @@ export function getSettings(): ExtensionSettings {
         if (!collection.groups) {
             collection.groups = [];
         }
-        // Migration: Add groupId to sliders that don't have it
+
+        // Migration: Add order to groups that don't have it
+        let maxGroupOrder = -1;
+        for (const group of collection.groups) {
+            if (group.order === undefined) {
+                group.order = collection.groups.indexOf(group);
+            }
+            maxGroupOrder = Math.max(maxGroupOrder, group.order);
+        }
+
+        // Migration: Add groupId and order to sliders that don't have them
+        let maxSliderOrder = maxGroupOrder;
         for (const slider of collection.sliders) {
             if (slider.groupId === undefined) {
                 slider.groupId = null;
+            }
+            if (slider.order === undefined) {
+                // Ungrouped sliders get order after groups, grouped sliders get order within their group context
+                maxSliderOrder++;
+                slider.order = maxSliderOrder;
+            } else {
+                maxSliderOrder = Math.max(maxSliderOrder, slider.order);
             }
         }
     }
@@ -359,8 +386,10 @@ function createSlider(): void {
         checkboxTrueValue: 'true',
         checkboxFalseValue: 'false',
         groupId: null,
+        order: getNextOrder(activeCollection),
     });
 
+    saveSettingsDebounced();
     renderSliderConfigs(settings);
 }
 
@@ -375,6 +404,7 @@ function createGroup(): void {
         id: generateGroupId(),
         name: 'New Group',
         collapsed: false,
+        order: getNextOrder(activeCollection),
     });
 
     saveSettingsDebounced();
@@ -726,16 +756,41 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         });
 
         upButton.addEventListener('click', () => {
-            if (index > 0) {
-                const activeCollection = settings.collections.find(c => c.active);
-                if (!activeCollection) {
-                    return;
+            const activeCollection = settings.collections.find(c => c.active);
+            if (!activeCollection) {
+                return;
+            }
+
+            if (slider.groupId) {
+                // Grouped slider: reorder within group
+                const groupSliders = activeCollection.sliders
+                    .filter(s => s.groupId === slider.groupId)
+                    .sort((a, b) => a.order - b.order);
+                const currentIdx = groupSliders.findIndex(s => s === slider);
+                if (currentIdx > 0) {
+                    const prevSlider = groupSliders[currentIdx - 1];
+                    const tempOrder = slider.order;
+                    slider.order = prevSlider.order;
+                    prevSlider.order = tempOrder;
+                    renderSliderConfigs(settings);
+                    saveSettingsDebounced();
                 }
-                const temp = activeCollection.sliders[index - 1];
-                activeCollection.sliders[index - 1] = activeCollection.sliders[index];
-                activeCollection.sliders[index] = temp;
-                renderSliderConfigs(settings);
-                saveSettingsDebounced();
+            } else {
+                // Ungrouped slider: reorder in unified list
+                const items: { order: number; isGroup: boolean; ref: SliderModel | SliderGroup }[] = [];
+                activeCollection.groups.forEach(g => items.push({ order: g.order, isGroup: true, ref: g }));
+                activeCollection.sliders.filter(s => !s.groupId).forEach(s => items.push({ order: s.order, isGroup: false, ref: s as SliderModel }));
+                items.sort((a, b) => a.order - b.order);
+
+                const currentIdx = items.findIndex(i => !i.isGroup && i.ref === slider);
+                if (currentIdx > 0) {
+                    const prevItem = items[currentIdx - 1];
+                    const tempOrder = slider.order;
+                    slider.order = prevItem.ref.order;
+                    prevItem.ref.order = tempOrder;
+                    renderSliderConfigs(settings);
+                    saveSettingsDebounced();
+                }
             }
         });
 
@@ -744,120 +799,206 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             if (!activeCollection) {
                 return;
             }
-            if (index < activeCollection.sliders.length - 1) {
-                const temp = activeCollection.sliders[index + 1];
-                activeCollection.sliders[index + 1] = activeCollection.sliders[index];
-                activeCollection.sliders[index] = temp;
-                renderSliderConfigs(settings);
-                saveSettingsDebounced();
+
+            if (slider.groupId) {
+                // Grouped slider: reorder within group
+                const groupSliders = activeCollection.sliders
+                    .filter(s => s.groupId === slider.groupId)
+                    .sort((a, b) => a.order - b.order);
+                const currentIdx = groupSliders.findIndex(s => s === slider);
+                if (currentIdx < groupSliders.length - 1) {
+                    const nextSlider = groupSliders[currentIdx + 1];
+                    const tempOrder = slider.order;
+                    slider.order = nextSlider.order;
+                    nextSlider.order = tempOrder;
+                    renderSliderConfigs(settings);
+                    saveSettingsDebounced();
+                }
+            } else {
+                // Ungrouped slider: reorder in unified list
+                const items: { order: number; isGroup: boolean; ref: SliderModel | SliderGroup }[] = [];
+                activeCollection.groups.forEach(g => items.push({ order: g.order, isGroup: true, ref: g }));
+                activeCollection.sliders.filter(s => !s.groupId).forEach(s => items.push({ order: s.order, isGroup: false, ref: s as SliderModel }));
+                items.sort((a, b) => a.order - b.order);
+
+                const currentIdx = items.findIndex(i => !i.isGroup && i.ref === slider);
+                if (currentIdx < items.length - 1) {
+                    const nextItem = items[currentIdx + 1];
+                    const tempOrder = slider.order;
+                    slider.order = nextItem.ref.order;
+                    nextItem.ref.order = tempOrder;
+                    renderSliderConfigs(settings);
+                    saveSettingsDebounced();
+                }
             }
         });
 
         return renderer.content;
     };
 
-    // Render groups first (with their sliders nested inside)
+    // Build unified list of items (groups and ungrouped sliders) sorted by order
+    type RenderItem =
+        | { type: 'group'; group: SliderGroup; groupIndex: number }
+        | { type: 'slider'; slider: SliderModel; sliderIndex: number };
+
+    const renderItems: RenderItem[] = [];
+
+    // Add groups
     activeCollection.groups.forEach((group, groupIndex) => {
-        const renderer = document.createElement('template');
-        renderer.innerHTML = groupTemplate;
-
-        const card = renderer.content.querySelector('.slider_macros_group_card') as HTMLDivElement;
-        const cardHeader = renderer.content.querySelector('.slider_macros_group_card_header') as HTMLDivElement;
-        const cardNameDisplay = renderer.content.querySelector('.slider_macros_group_card_name') as HTMLSpanElement;
-        const cardCountDisplay = renderer.content.querySelector('.slider_macros_group_card_count') as HTMLSpanElement;
-        const groupSlidersContainer = renderer.content.querySelector('.slider_macros_group_sliders') as HTMLDivElement;
-
-        const nameInput = renderer.content.querySelector('input[name="groupName"]') as HTMLInputElement;
-        const deleteButton = renderer.content.querySelector('button[name="deleteGroup"]') as HTMLButtonElement;
-        const upButton = renderer.content.querySelector('button[name="up"]') as HTMLButtonElement;
-        const downButton = renderer.content.querySelector('button[name="down"]') as HTMLButtonElement;
-
-        // Get sliders in this group
-        const slidersInGroup = activeCollection.sliders
-            .map((s, i) => ({ slider: s, index: i }))
-            .filter(item => item.slider.groupId === group.id);
-
-        // Set initial values
-        card.dataset.groupId = group.id;
-        cardNameDisplay.textContent = group.name || 'New Group';
-        cardCountDisplay.textContent = `(${slidersInGroup.length} slider${slidersInGroup.length !== 1 ? 's' : ''})`;
-        nameInput.value = group.name;
-
-        // Render sliders inside the group
-        slidersInGroup.forEach(({ slider, index }) => {
-            const sliderCard = createSliderCard(slider, index);
-            groupSlidersContainer.appendChild(sliderCard);
-        });
-
-        // Expand/collapse toggle
-        cardHeader.addEventListener('click', (e) => {
-            const target = e.target as HTMLElement;
-            if (target.closest('.slider_macros_card_controls')) {
-                return;
-            }
-            const isExpanded = card.dataset.expanded === 'true';
-            card.dataset.expanded = isExpanded ? 'false' : 'true';
-        });
-
-        // Name change
-        nameInput.addEventListener('input', () => {
-            group.name = nameInput.value;
-            cardNameDisplay.textContent = group.name || 'New Group';
-            debouncedSaveSettings();
-        });
-
-        // Delete group
-        deleteButton.addEventListener('click', async () => {
-            const confirm = await Popup.show.confirm('Delete Group', `Are you sure you want to delete the group "${group.name}"? Sliders in this group will become ungrouped.`);
-            if (!confirm) {
-                return;
-            }
-            // Ungroup all sliders in this group
-            activeCollection.sliders.forEach(s => {
-                if (s.groupId === group.id) {
-                    s.groupId = null;
-                }
-            });
-            activeCollection.groups.splice(groupIndex, 1);
-            renderSliderConfigs(settings);
-            saveSettingsDebounced();
-        });
-
-        // Move up
-        upButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (groupIndex > 0) {
-                const temp = activeCollection.groups[groupIndex - 1];
-                activeCollection.groups[groupIndex - 1] = activeCollection.groups[groupIndex];
-                activeCollection.groups[groupIndex] = temp;
-                renderSliderConfigs(settings);
-                saveSettingsDebounced();
-            }
-        });
-
-        // Move down
-        downButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (groupIndex < activeCollection.groups.length - 1) {
-                const temp = activeCollection.groups[groupIndex + 1];
-                activeCollection.groups[groupIndex + 1] = activeCollection.groups[groupIndex];
-                activeCollection.groups[groupIndex] = temp;
-                renderSliderConfigs(settings);
-                saveSettingsDebounced();
-            }
-        });
-
-        elements.list.appendChild(renderer.content);
+        renderItems.push({ type: 'group', group, groupIndex });
     });
 
-    // Render ungrouped sliders after groups
-    const ungroupedSliders = activeCollection.sliders
-        .map((s, i) => ({ slider: s, index: i }))
-        .filter(item => !item.slider.groupId);
+    // Add ungrouped sliders
+    activeCollection.sliders.forEach((slider, sliderIndex) => {
+        if (!slider.groupId) {
+            renderItems.push({ type: 'slider', slider, sliderIndex });
+        }
+    });
 
-    ungroupedSliders.forEach(({ slider, index }) => {
-        const sliderCard = createSliderCard(slider, index);
-        elements.list.appendChild(sliderCard);
+    // Sort by order
+    renderItems.sort((a, b) => {
+        const orderA = a.type === 'group' ? a.group.order : a.slider.order;
+        const orderB = b.type === 'group' ? b.group.order : b.slider.order;
+        return orderA - orderB;
+    });
+
+    // Helper to get sorted items for reordering
+    const getOrderedItems = (): { order: number; isGroup: boolean; id: string }[] => {
+        const items: { order: number; isGroup: boolean; id: string }[] = [];
+        activeCollection.groups.forEach(g => items.push({ order: g.order, isGroup: true, id: g.id }));
+        activeCollection.sliders.filter(s => !s.groupId).forEach(s => items.push({ order: s.order, isGroup: false, id: s.property }));
+        return items.sort((a, b) => a.order - b.order);
+    };
+
+    // Render items in order
+    renderItems.forEach((item) => {
+        if (item.type === 'slider') {
+            const sliderCard = createSliderCard(item.slider, item.sliderIndex);
+            elements.list.appendChild(sliderCard);
+        } else {
+            const { group, groupIndex } = item;
+            const renderer = document.createElement('template');
+            renderer.innerHTML = groupTemplate;
+
+            const card = renderer.content.querySelector('.slider_macros_group_card') as HTMLDivElement;
+            const cardHeader = renderer.content.querySelector('.slider_macros_group_card_header') as HTMLDivElement;
+            const cardNameDisplay = renderer.content.querySelector('.slider_macros_group_card_name') as HTMLSpanElement;
+            const cardCountDisplay = renderer.content.querySelector('.slider_macros_group_card_count') as HTMLSpanElement;
+            const groupSlidersContainer = renderer.content.querySelector('.slider_macros_group_sliders') as HTMLDivElement;
+
+            const nameInput = renderer.content.querySelector('input[name="groupName"]') as HTMLInputElement;
+            const deleteButton = renderer.content.querySelector('button[name="deleteGroup"]') as HTMLButtonElement;
+            const upButton = renderer.content.querySelector('button[name="up"]') as HTMLButtonElement;
+            const downButton = renderer.content.querySelector('button[name="down"]') as HTMLButtonElement;
+
+            // Get sliders in this group, sorted by their order
+            const slidersInGroup = activeCollection.sliders
+                .map((s, i) => ({ slider: s, index: i }))
+                .filter(item => item.slider.groupId === group.id)
+                .sort((a, b) => a.slider.order - b.slider.order);
+
+            // Set initial values
+            card.dataset.groupId = group.id;
+            cardNameDisplay.textContent = group.name || 'New Group';
+            cardCountDisplay.textContent = `(${slidersInGroup.length} slider${slidersInGroup.length !== 1 ? 's' : ''})`;
+            nameInput.value = group.name;
+
+            // Render sliders inside the group
+            slidersInGroup.forEach(({ slider, index }) => {
+                const sliderCard = createSliderCard(slider, index);
+                groupSlidersContainer.appendChild(sliderCard);
+            });
+
+            // Expand/collapse toggle
+            cardHeader.addEventListener('click', (e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('.slider_macros_card_controls')) {
+                    return;
+                }
+                const isExpanded = card.dataset.expanded === 'true';
+                card.dataset.expanded = isExpanded ? 'false' : 'true';
+            });
+
+            // Name change
+            nameInput.addEventListener('input', () => {
+                group.name = nameInput.value;
+                cardNameDisplay.textContent = group.name || 'New Group';
+                debouncedSaveSettings();
+            });
+
+            // Delete group
+            deleteButton.addEventListener('click', async () => {
+                const confirm = await Popup.show.confirm('Delete Group', `Are you sure you want to delete the group "${group.name}"? Sliders in this group will become ungrouped.`);
+                if (!confirm) {
+                    return;
+                }
+                // Ungroup all sliders in this group
+                activeCollection.sliders.forEach(s => {
+                    if (s.groupId === group.id) {
+                        s.groupId = null;
+                    }
+                });
+                activeCollection.groups.splice(groupIndex, 1);
+                renderSliderConfigs(settings);
+                saveSettingsDebounced();
+            });
+
+            // Move up - swap order with previous item
+            upButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const orderedItems = getOrderedItems();
+                const currentIdx = orderedItems.findIndex(i => i.isGroup && i.id === group.id);
+                if (currentIdx > 0) {
+                    const prevItem = orderedItems[currentIdx - 1];
+                    const currentOrder = group.order;
+                    // Swap orders
+                    if (prevItem.isGroup) {
+                        const prevGroup = activeCollection.groups.find(g => g.id === prevItem.id);
+                        if (prevGroup) {
+                            group.order = prevGroup.order;
+                            prevGroup.order = currentOrder;
+                        }
+                    } else {
+                        const prevSlider = activeCollection.sliders.find(s => s.property === prevItem.id && !s.groupId);
+                        if (prevSlider) {
+                            group.order = prevSlider.order;
+                            prevSlider.order = currentOrder;
+                        }
+                    }
+                    renderSliderConfigs(settings);
+                    saveSettingsDebounced();
+                }
+            });
+
+            // Move down - swap order with next item
+            downButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const orderedItems = getOrderedItems();
+                const currentIdx = orderedItems.findIndex(i => i.isGroup && i.id === group.id);
+                if (currentIdx < orderedItems.length - 1) {
+                    const nextItem = orderedItems[currentIdx + 1];
+                    const currentOrder = group.order;
+                    // Swap orders
+                    if (nextItem.isGroup) {
+                        const nextGroup = activeCollection.groups.find(g => g.id === nextItem.id);
+                        if (nextGroup) {
+                            group.order = nextGroup.order;
+                            nextGroup.order = currentOrder;
+                        }
+                    } else {
+                        const nextSlider = activeCollection.sliders.find(s => s.property === nextItem.id && !s.groupId);
+                        if (nextSlider) {
+                            group.order = nextSlider.order;
+                            nextSlider.order = currentOrder;
+                        }
+                    }
+                    renderSliderConfigs(settings);
+                    saveSettingsDebounced();
+                }
+            });
+
+            elements.list.appendChild(renderer.content);
+        }
     });
 
     if (activeCollection.sliders.length === 0 && activeCollection.groups.length === 0) {
@@ -1295,64 +1436,92 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
         targetContainer.appendChild(renderer.content);
     };
 
-    // Render ungrouped sliders first
-    const ungroupedSliders = activeCollection.sliders.filter(s => !s.groupId);
-    ungroupedSliders.forEach(slider => renderSliderToContainer(slider, container));
+    // Build unified list of items (groups and ungrouped sliders) sorted by order
+    type CompletionRenderItem =
+        | { type: 'group'; group: SliderGroup }
+        | { type: 'slider'; slider: SliderModel };
 
-    // Render groups with their sliders
+    const completionItems: CompletionRenderItem[] = [];
+
+    // Add groups (only if they have enabled sliders)
     activeCollection.groups.forEach((group) => {
         const slidersInGroup = activeCollection.sliders.filter(s => s.groupId === group.id);
-
-        // Skip empty groups in the completion panel
-        if (slidersInGroup.filter(s => s.enabled && s.property && s.name).length === 0) {
-            return;
-        }
-
-        // Create group container
-        const groupContainer = document.createElement('div');
-        groupContainer.className = 'slider_macros_group';
-        groupContainer.dataset.groupId = group.id;
-        groupContainer.dataset.collapsed = group.collapsed ? 'true' : 'false';
-
-        // Create group header
-        const groupHeader = document.createElement('div');
-        groupHeader.className = 'slider_macros_group_header';
-
-        const groupChevron = document.createElement('i');
-        groupChevron.className = 'fa-solid fa-chevron-down slider_macros_group_chevron';
-
-        const groupName = document.createElement('span');
-        groupName.className = 'slider_macros_group_name';
-        groupName.textContent = group.name;
-
-        const groupCount = document.createElement('span');
-        groupCount.className = 'slider_macros_group_count';
         const enabledCount = slidersInGroup.filter(s => s.enabled && s.property && s.name).length;
-        groupCount.textContent = `(${enabledCount})`;
+        if (enabledCount > 0) {
+            completionItems.push({ type: 'group', group });
+        }
+    });
 
-        groupHeader.appendChild(groupChevron);
-        groupHeader.appendChild(groupName);
-        groupHeader.appendChild(groupCount);
+    // Add ungrouped sliders (only if enabled)
+    activeCollection.sliders.forEach((slider) => {
+        if (!slider.groupId && slider.enabled && slider.property && slider.name) {
+            completionItems.push({ type: 'slider', slider });
+        }
+    });
 
-        // Toggle collapse on header click
-        groupHeader.addEventListener('click', () => {
-            const isCollapsed = groupContainer.dataset.collapsed === 'true';
-            groupContainer.dataset.collapsed = isCollapsed ? 'false' : 'true';
-            group.collapsed = !isCollapsed;
-            saveSettingsDebounced();
-        });
+    // Sort by order
+    completionItems.sort((a, b) => {
+        const orderA = a.type === 'group' ? a.group.order : a.slider.order;
+        const orderB = b.type === 'group' ? b.group.order : b.slider.order;
+        return orderA - orderB;
+    });
 
-        groupContainer.appendChild(groupHeader);
+    // Render items in order
+    completionItems.forEach((item) => {
+        if (item.type === 'slider') {
+            renderSliderToContainer(item.slider, container);
+        } else {
+            const group = item.group;
+            const slidersInGroup = activeCollection.sliders
+                .filter(s => s.groupId === group.id)
+                .sort((a, b) => a.order - b.order);
 
-        // Create group content
-        const groupContent = document.createElement('div');
-        groupContent.className = 'slider_macros_group_content';
+            // Create group container
+            const groupContainer = document.createElement('div');
+            groupContainer.className = 'slider_macros_group';
+            groupContainer.dataset.groupId = group.id;
+            groupContainer.dataset.collapsed = group.collapsed ? 'true' : 'false';
 
-        // Render sliders into group content
-        slidersInGroup.forEach(slider => renderSliderToContainer(slider, groupContent));
+            // Create group header
+            const groupHeader = document.createElement('div');
+            groupHeader.className = 'slider_macros_group_header';
 
-        groupContainer.appendChild(groupContent);
-        container.appendChild(groupContainer);
+            const groupChevron = document.createElement('i');
+            groupChevron.className = 'fa-solid fa-chevron-down slider_macros_group_chevron';
+
+            const groupName = document.createElement('span');
+            groupName.className = 'slider_macros_group_name';
+            groupName.textContent = group.name;
+
+            const groupCount = document.createElement('span');
+            groupCount.className = 'slider_macros_group_count';
+            const enabledCount = slidersInGroup.filter(s => s.enabled && s.property && s.name).length;
+            groupCount.textContent = `(${enabledCount})`;
+
+            groupHeader.appendChild(groupChevron);
+            groupHeader.appendChild(groupName);
+            groupHeader.appendChild(groupCount);
+
+            // Toggle collapse on header click
+            groupHeader.addEventListener('click', () => {
+                const isCollapsed = groupContainer.dataset.collapsed === 'true';
+                groupContainer.dataset.collapsed = isCollapsed ? 'false' : 'true';
+                group.collapsed = !isCollapsed;
+                saveSettingsDebounced();
+            });
+
+            groupContainer.appendChild(groupHeader);
+
+            // Create group content
+            const groupContent = document.createElement('div');
+            groupContent.className = 'slider_macros_group_content';
+
+            // Render sliders into group content
+            slidersInGroup.forEach(slider => renderSliderToContainer(slider, groupContent));
+
+            groupContainer.appendChild(groupContent);
+            container.appendChild(groupContainer);
+        }
     });
 
     // Update the macros based on the current settings (initial load)
