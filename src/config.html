@@ -32,11 +32,17 @@
             </div>
             <div class="slider_macros_field">
                 <label class="slider_macros_label">Macro Variable</label>
-                <div class="slider_macros_macro_input">
-                    <span class="slider_macros_macro_prefix">{{</span>
-                    <input class="text_pole" type="text" name="property" placeholder="myVar">
-                    <span class="slider_macros_macro_suffix">}}</span>
+                <div class="slider_macros_macro_input_row">
+                    <div class="slider_macros_macro_input">
+                        <span class="slider_macros_macro_prefix">{{</span>
+                        <input class="text_pole" type="text" name="property" placeholder="myVar">
+                        <span class="slider_macros_macro_suffix">}}</span>
+                    </div>
+                    <button class="menu_button menu_button_icon slider_macros_btn_search_macro" name="searchMacro" type="button" title="Search existing macros to override">
+                        <i class="fa-solid fa-search"></i>
+                    </button>
                 </div>
+                <div class="slider_macros_macro_status" name="macroStatus"></div>
             </div>
         </div>
         <div class="slider_macros_field">

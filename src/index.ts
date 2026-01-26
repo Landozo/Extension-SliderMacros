@@ -10,7 +10,7 @@ import groupTemplate from './group.html';
 // import { MacrosParser } from '../../../../macros.js';
 // import { MacroCategory } from '../../../../macros/engine/MacroRegistry';
 
-const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser } = (SillyTavern.getContext() as any);
+const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser, substituteParams } = (SillyTavern.getContext() as any);
 
 const MODULE_NAME = 'sliderMacros';
 const DEBOUNCE_DELAY = 300;
@@ -32,6 +32,275 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, delay: number):
 // Debounced versions for text input handlers
 const debouncedSaveSettings = debounce(() => saveSettingsDebounced(), DEBOUNCE_DELAY);
 const createDebouncedRender = (settings: ExtensionSettings) => debounce(() => renderCompletionSliders(settings), DEBOUNCE_DELAY);
+
+// ============================================================================
+// Universal Macro System Handler
+// ============================================================================
+
+interface MacroInfo {
+    name: string;
+    description: string;
+    source: 'v2' | 'legacy';
+    category?: string;
+}
+
+/**
+ * Retrieves a macro value using the universal handler approach.
+ * Prefers the 2.0 experimental engine, falls back to legacy system.
+ * @param macroName - The name of the macro (without braces)
+ * @returns The evaluated value, or the raw macro string if not found
+ */
+function getMacroValue(macroName: string): string {
+    const raw = `{{${macroName}}}`;
+
+    // 1. If experimental engine is enabled, try the new system first
+    if (power_user?.experimental_macro_engine && macros?.engine) {
+        try {
+            const env = macros.envBuilder?.buildFromRawEnv({});
+            if (env) {
+                const newVal = macros.engine.evaluate(raw, env);
+                if (newVal !== raw) return newVal;
+            }
+        } catch (e) {
+            console.warn('[SliderMacros] Failed to retrieve macro from new engine:', e);
+        }
+    }
+
+    // 2. Try the active system (Legacy or Experimental via substituteParams)
+    if (typeof substituteParams === 'function') {
+        const val = substituteParams(raw);
+        if (val !== raw) return val;
+    }
+
+    // 3. If the active system is Legacy, explicitly check the New Engine as fallback
+    if (!power_user?.experimental_macro_engine && macros?.registry && macros?.engine) {
+        try {
+            if (macros.registry.hasMacro(macroName)) {
+                const env = macros.envBuilder?.buildFromRawEnv({});
+                if (env) {
+                    const newVal = macros.engine.evaluate(raw, env);
+                    if (newVal !== raw) return newVal;
+                }
+            }
+        } catch (e) {
+            console.warn('[SliderMacros] Failed to retrieve macro from new engine fallback:', e);
+        }
+    }
+
+    return raw;
+}
+
+/**
+ * Checks if a macro exists in either system.
+ * @param macroName - The name of the macro (without braces)
+ * @returns True if the macro exists
+ */
+function hasMacro(macroName: string): boolean {
+    // Check new registry first
+    if (macros?.registry?.hasMacro?.(macroName)) {
+        return true;
+    }
+
+    // Check legacy parser
+    if (MacrosParser) {
+        for (const { key } of MacrosParser) {
+            if (key === macroName) return true;
+        }
+    }
+
+    // Try to resolve it - if it changes, the macro exists
+    const raw = `{{${macroName}}}`;
+    const resolved = getMacroValue(macroName);
+    return resolved !== raw;
+}
+
+/**
+ * Lists all known macros from both systems.
+ * Prefers the 2.0 registry for metadata, falls back to legacy.
+ * @returns Array of macro info objects
+ */
+function getAllKnownMacros(): MacroInfo[] {
+    const macroMap = new Map<string, MacroInfo>();
+
+    // 1. Add everything from the New Registry (Preferred source)
+    if (macros?.registry?.getAllMacros) {
+        try {
+            const newMacros = macros.registry.getAllMacros({ excludeHiddenAliases: true });
+            for (const macro of newMacros) {
+                macroMap.set(macro.name, {
+                    name: macro.name,
+                    description: macro.description || '',
+                    source: 'v2',
+                    category: macro.category,
+                });
+            }
+        } catch (e) {
+            console.warn('[SliderMacros] Failed to get macros from new registry:', e);
+        }
+    }
+
+    // 2. Add Legacy macros (Fallback source)
+    if (MacrosParser) {
+        try {
+            for (const { key, description } of MacrosParser) {
+                if (!macroMap.has(key)) {
+                    macroMap.set(key, {
+                        name: key,
+                        description: description || '',
+                        source: 'legacy',
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[SliderMacros] Failed to get macros from legacy parser:', e);
+        }
+    }
+
+    return Array.from(macroMap.values());
+}
+
+/**
+ * Searches macros by name or description.
+ * @param query - Search query string
+ * @param limit - Maximum number of results
+ * @returns Filtered array of macro info objects
+ */
+function searchMacros(query: string, limit = 20): MacroInfo[] {
+    const allMacros = getAllKnownMacros();
+    const lowerQuery = query.toLowerCase().trim();
+
+    if (!lowerQuery) {
+        return allMacros.slice(0, limit);
+    }
+
+    return allMacros
+        .filter(m =>
+            m.name.toLowerCase().includes(lowerQuery) ||
+            m.description.toLowerCase().includes(lowerQuery)
+        )
+        .slice(0, limit);
+}
+
+/**
+ * Shows a popup dialog for searching and selecting existing macros.
+ * @returns Promise resolving to selected macro info, or null if cancelled
+ */
+async function showMacroSearchPopup(): Promise<MacroInfo | null> {
+    return new Promise((resolve) => {
+        // Build the search UI
+        const container = document.createElement('div');
+        container.className = 'slider_macros_search_container';
+
+        const inputRow = document.createElement('div');
+        inputRow.className = 'slider_macros_search_input_row';
+
+        const searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.className = 'text_pole';
+        searchInput.placeholder = 'Search macros by name or description...';
+        inputRow.appendChild(searchInput);
+
+        container.appendChild(inputRow);
+
+        const resultsContainer = document.createElement('div');
+        resultsContainer.className = 'slider_macros_search_results';
+        container.appendChild(resultsContainer);
+
+        let selectedMacro: MacroInfo | null = null;
+
+        const renderResults = (query: string) => {
+            const results = searchMacros(query, 50);
+            resultsContainer.innerHTML = '';
+
+            if (results.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'slider_macros_search_empty';
+                empty.textContent = query ? 'No macros found matching your search.' : 'No macros available.';
+                resultsContainer.appendChild(empty);
+                return;
+            }
+
+            results.forEach(macro => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'slider_macros_search_result';
+
+                const nameRow = document.createElement('div');
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'slider_macros_search_result_name';
+                nameSpan.textContent = `{{${macro.name}}}`;
+                nameRow.appendChild(nameSpan);
+
+                const sourceSpan = document.createElement('span');
+                sourceSpan.className = `slider_macros_search_result_source ${macro.source === 'legacy' ? 'legacy' : ''}`;
+                sourceSpan.textContent = macro.source === 'v2' ? '2.0' : 'Legacy';
+                nameRow.appendChild(sourceSpan);
+
+                resultItem.appendChild(nameRow);
+
+                if (macro.description) {
+                    const descSpan = document.createElement('div');
+                    descSpan.className = 'slider_macros_search_result_desc';
+                    descSpan.textContent = macro.description;
+                    resultItem.appendChild(descSpan);
+                }
+
+                // Show current value
+                try {
+                    const currentValue = getMacroValue(macro.name);
+                    if (currentValue !== `{{${macro.name}}}`) {
+                        const valueSpan = document.createElement('div');
+                        valueSpan.className = 'slider_macros_search_result_value';
+                        const displayValue = currentValue.length > 50 ? currentValue.substring(0, 50) + '...' : currentValue;
+                        valueSpan.textContent = `Current: ${displayValue}`;
+                        resultItem.appendChild(valueSpan);
+                    }
+                } catch {
+                    // Ignore errors getting value
+                }
+
+                resultItem.addEventListener('click', () => {
+                    selectedMacro = macro;
+                    // Close popup by clicking the confirm button
+                    const confirmBtn = document.querySelector('.popup-button-ok') as HTMLButtonElement;
+                    if (confirmBtn) confirmBtn.click();
+                });
+
+                resultsContainer.appendChild(resultItem);
+            });
+        };
+
+        // Initial render
+        renderResults('');
+
+        // Debounced search
+        let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+        searchInput.addEventListener('input', () => {
+            if (searchTimeout) clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                renderResults(searchInput.value);
+            }, 150);
+        });
+
+        // Show popup
+        Popup.show.confirm('Search Existing Macros', container, {
+            okButton: 'Select',
+            cancelButton: 'Cancel',
+        }).then((confirmed: boolean) => {
+            if (confirmed && selectedMacro) {
+                resolve(selectedMacro);
+            } else {
+                resolve(null);
+            }
+        });
+
+        // Focus search input after popup opens
+        setTimeout(() => searchInput.focus(), 100);
+    });
+}
+
+// ============================================================================
+// End Universal Macro System Handler
+// ============================================================================
 
 interface ChatCompletionRequestData {
     chat_completion_source: string;
@@ -475,6 +744,10 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const dropdownOptionsContainer = renderer.content.querySelector('.slider_macros_dropdown_options') as HTMLDivElement;
         const addDropdownOptionButton = renderer.content.querySelector('button[name="addDropdownOption"]') as HTMLButtonElement;
 
+        // Macro search elements
+        const searchMacroButton = renderer.content.querySelector('button[name="searchMacro"]') as HTMLButtonElement;
+        const macroStatusElement = renderer.content.querySelector('.slider_macros_macro_status') as HTMLDivElement;
+
         // Ensure defaults for new fields
         if (!slider.dropdownOptions) slider.dropdownOptions = [];
         if (!slider.colorFormat) slider.colorFormat = 'hex';
@@ -711,9 +984,57 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         propertyInput.addEventListener('input', () => {
             slider.property = propertyInput.value;
             cardMacroDisplay.textContent = slider.property || '';
+            updateMacroStatus();
             debouncedRender();
             debouncedSaveSettings();
         });
+
+        // Macro status indicator - shows if macro already exists
+        const updateMacroStatus = () => {
+            if (!macroStatusElement) return;
+            const macroName = propertyInput.value.trim();
+            if (!macroName) {
+                macroStatusElement.textContent = '';
+                macroStatusElement.className = 'slider_macros_macro_status';
+                return;
+            }
+            if (hasMacro(macroName)) {
+                const currentValue = getMacroValue(macroName);
+                const displayValue = currentValue.length > 30 ? currentValue.substring(0, 30) + '...' : currentValue;
+                macroStatusElement.textContent = `Overrides existing macro (current: ${displayValue})`;
+                macroStatusElement.className = 'slider_macros_macro_status exists';
+            } else {
+                macroStatusElement.textContent = 'New macro will be created';
+                macroStatusElement.className = 'slider_macros_macro_status available';
+            }
+        };
+
+        // Initial status check
+        updateMacroStatus();
+
+        // Search macro button - opens popup to search and select existing macros
+        if (searchMacroButton) {
+            searchMacroButton.addEventListener('click', async () => {
+                const selectedMacro = await showMacroSearchPopup();
+                if (selectedMacro) {
+                    propertyInput.value = selectedMacro.name;
+                    slider.property = selectedMacro.name;
+                    cardMacroDisplay.textContent = selectedMacro.name;
+                    // Auto-fill name if empty
+                    if (!slider.name || slider.name === 'New Slider') {
+                        const prettyName = selectedMacro.name
+                            .replace(/[_-]/g, ' ')
+                            .replace(/\b\w/g, c => c.toUpperCase());
+                        nameInput.value = prettyName;
+                        slider.name = prettyName;
+                        cardNameDisplay.textContent = prettyName;
+                    }
+                    updateMacroStatus();
+                    renderCompletionSliders(settings);
+                    saveSettingsDebounced();
+                }
+            });
+        }
 
         minInput.addEventListener('input', () => {
             slider.min = minInput.value;
