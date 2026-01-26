@@ -2202,9 +2202,10 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
             if (rangeContainer) {
                 rangeContainer.innerHTML = '';
                 rangeContainer.style.flex = '1';
-                rangeContainer.style.display = 'flex';
-                rangeContainer.style.alignItems = 'center';
-                rangeContainer.style.gap = '10px';
+
+                // Create centered wrapper for color picker
+                const colorWrapper = document.createElement('div');
+                colorWrapper.className = 'slider_macros_color_wrapper';
 
                 const colorInput = document.createElement('input');
                 colorInput.type = 'color';
@@ -2241,8 +2242,9 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
                 colorInput.addEventListener('input', updateFromColor);
                 hexDisplay.addEventListener('change', updateFromHex);
 
-                rangeContainer.appendChild(colorInput);
-                rangeContainer.appendChild(hexDisplay);
+                colorWrapper.appendChild(colorInput);
+                colorWrapper.appendChild(hexDisplay);
+                rangeContainer.appendChild(colorWrapper);
             }
 
             // Hide the counter
