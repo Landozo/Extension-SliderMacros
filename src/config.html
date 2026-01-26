@@ -41,6 +41,9 @@
                 <option value="Numeric" selected>Numeric</option>
                 <option value="Boolean">Boolean</option>
                 <option value="MultiSelect">MultiSelect</option>
+                <option value="Dropdown">Dropdown</option>
+                <option value="Color">Color</option>
+                <option value="Checkbox">Checkbox</option>
             </select>
         </div>
         <!-- Numeric options -->
@@ -91,6 +94,54 @@
                     <label class="slider_macros_label">Option 4 <span class="slider_macros_optional">(optional)</span></label>
                     <input class="text_pole" type="text" name="option4" placeholder="">
                 </div>
+            </div>
+        </div>
+        <!-- Dropdown options -->
+        <div class="dropdown-only slider_macros_type_section">
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Dropdown Options <span class="slider_macros_optional">(key → macro value)</span></label>
+                <div class="slider_macros_dropdown_options" data-name="dropdownOptions">
+                    <!-- Dynamic rows added here -->
+                </div>
+                <button class="menu_button menu_button_icon slider_macros_btn_add_option" name="addDropdownOption" type="button">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add Option</span>
+                </button>
+            </div>
+        </div>
+        <!-- Color options -->
+        <div class="color-only slider_macros_type_section">
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Output Format</label>
+                <select class="text_pole" name="colorFormat">
+                    <option value="hex" selected>HEX (#RRGGBB)</option>
+                    <option value="rgb">RGB (rgb(r, g, b))</option>
+                    <option value="hsv">HSV (hsv(h, s%, v%))</option>
+                </select>
+            </div>
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Default Color</label>
+                <input class="text_pole slider_macros_color_default" type="color" name="defaultColor" value="#ffffff">
+            </div>
+        </div>
+        <!-- Checkbox options -->
+        <div class="checkbox-only slider_macros_type_section">
+            <div class="slider_macros_field_row">
+                <div class="slider_macros_field slider_macros_field_half">
+                    <label class="slider_macros_label">True Value <span class="slider_macros_optional">(macro output when checked)</span></label>
+                    <input class="text_pole" type="text" name="checkboxTrueValue" placeholder="true">
+                </div>
+                <div class="slider_macros_field slider_macros_field_half">
+                    <label class="slider_macros_label">False Value <span class="slider_macros_optional">(macro output when unchecked)</span></label>
+                    <input class="text_pole" type="text" name="checkboxFalseValue" placeholder="false">
+                </div>
+            </div>
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Default State</label>
+                <select class="text_pole" name="defaultCheckbox">
+                    <option value="false" selected>Unchecked</option>
+                    <option value="true">Checked</option>
+                </select>
             </div>
         </div>
         <!-- Delete action at bottom of expanded view -->

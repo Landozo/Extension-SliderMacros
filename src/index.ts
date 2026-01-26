@@ -37,6 +37,11 @@ interface ChatCompletionRequestData {
     custom_include_body: string;
 }
 
+interface DropdownOption {
+    key: string;
+    value: string;
+}
+
 interface SliderModel {
     name: string;
     property: string;
@@ -44,9 +49,16 @@ interface SliderModel {
     min: string;
     max: string;
     step: string;
-    value: number;
+    value: number | string | boolean;
     enabled: boolean;
     options: string[];
+    // Dropdown type fields
+    dropdownOptions: DropdownOption[];
+    // Color type fields
+    colorFormat: 'hex' | 'rgb' | 'hsv';
+    // Checkbox type fields
+    checkboxTrueValue: string;
+    checkboxFalseValue: string;
 }
 
 interface SliderCollection {
@@ -310,6 +322,10 @@ function createSlider(): void {
         value: 0,
         enabled: true,
         options: [],
+        dropdownOptions: [],
+        colorFormat: 'hex',
+        checkboxTrueValue: 'true',
+        checkboxFalseValue: 'false',
     });
 
     renderSliderConfigs(settings);
@@ -361,6 +377,24 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const numericOnly = renderer.content.querySelector('.numeric-only') as HTMLElement;
         const booleanOnly = renderer.content.querySelector('.boolean-only') as HTMLElement;
         const multiSelectOnly = renderer.content.querySelector('.multiselect-only') as HTMLElement;
+        const dropdownOnly = renderer.content.querySelector('.dropdown-only') as HTMLElement;
+        const colorOnly = renderer.content.querySelector('.color-only') as HTMLElement;
+        const checkboxOnly = renderer.content.querySelector('.checkbox-only') as HTMLElement;
+
+        // New type inputs
+        const colorFormatSelect = renderer.content.querySelector('select[name="colorFormat"]') as HTMLSelectElement;
+        const defaultColorInput = renderer.content.querySelector('input[name="defaultColor"]') as HTMLInputElement;
+        const checkboxTrueValueInput = renderer.content.querySelector('input[name="checkboxTrueValue"]') as HTMLInputElement;
+        const checkboxFalseValueInput = renderer.content.querySelector('input[name="checkboxFalseValue"]') as HTMLInputElement;
+        const defaultCheckboxSelect = renderer.content.querySelector('select[name="defaultCheckbox"]') as HTMLSelectElement;
+        const dropdownOptionsContainer = renderer.content.querySelector('.slider_macros_dropdown_options') as HTMLDivElement;
+        const addDropdownOptionButton = renderer.content.querySelector('button[name="addDropdownOption"]') as HTMLButtonElement;
+
+        // Ensure defaults for new fields
+        if (!slider.dropdownOptions) slider.dropdownOptions = [];
+        if (!slider.colorFormat) slider.colorFormat = 'hex';
+        if (!slider.checkboxTrueValue) slider.checkboxTrueValue = 'true';
+        if (!slider.checkboxFalseValue) slider.checkboxFalseValue = 'false';
 
         // Set initial values
         nameInput.value = slider.name;
@@ -370,6 +404,13 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         stepInput.value = slider.step;
         enableCheckbox.checked = slider.enabled;
         typeSelect.value = slider.type || 'Numeric';
+
+        // Set values for new type inputs
+        if (colorFormatSelect) colorFormatSelect.value = slider.colorFormat;
+        if (defaultColorInput) defaultColorInput.value = typeof slider.value === 'string' && slider.value.startsWith('#') ? slider.value : '#ffffff';
+        if (checkboxTrueValueInput) checkboxTrueValueInput.value = slider.checkboxTrueValue;
+        if (checkboxFalseValueInput) checkboxFalseValueInput.value = slider.checkboxFalseValue;
+        if (defaultCheckboxSelect) defaultCheckboxSelect.value = slider.value === true ? 'true' : 'false';
 
         // Update card header display
         cardNameDisplay.textContent = slider.name || 'New Slider';
@@ -423,7 +464,117 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             if (numericOnly) numericOnly.style.display = type === 'Numeric' ? 'block' : 'none';
             if (booleanOnly) booleanOnly.style.display = type === 'Boolean' ? 'block' : 'none';
             if (multiSelectOnly) multiSelectOnly.style.display = type === 'MultiSelect' ? 'block' : 'none';
+            if (dropdownOnly) dropdownOnly.style.display = type === 'Dropdown' ? 'block' : 'none';
+            if (colorOnly) colorOnly.style.display = type === 'Color' ? 'block' : 'none';
+            if (checkboxOnly) checkboxOnly.style.display = type === 'Checkbox' ? 'block' : 'none';
         };
+
+        // Dropdown options management
+        const renderDropdownOptions = () => {
+            if (!dropdownOptionsContainer) return;
+            dropdownOptionsContainer.innerHTML = '';
+            slider.dropdownOptions.forEach((opt, optIndex) => {
+                const row = document.createElement('div');
+                row.className = 'slider_macros_dropdown_option_row';
+
+                const keyInput = document.createElement('input');
+                keyInput.type = 'text';
+                keyInput.className = 'text_pole slider_macros_dropdown_key';
+                keyInput.placeholder = 'Display name';
+                keyInput.value = opt.key;
+                keyInput.addEventListener('input', () => {
+                    slider.dropdownOptions[optIndex].key = keyInput.value;
+                    debouncedRender();
+                    debouncedSaveSettings();
+                });
+
+                const arrow = document.createElement('span');
+                arrow.className = 'slider_macros_dropdown_arrow';
+                arrow.textContent = '→';
+
+                const valueInput = document.createElement('input');
+                valueInput.type = 'text';
+                valueInput.className = 'text_pole slider_macros_dropdown_value';
+                valueInput.placeholder = 'Macro value';
+                valueInput.value = opt.value;
+                valueInput.addEventListener('input', () => {
+                    slider.dropdownOptions[optIndex].value = valueInput.value;
+                    debouncedRender();
+                    debouncedSaveSettings();
+                });
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'menu_button menu_button_icon slider_macros_btn_remove_option';
+                removeBtn.innerHTML = '<i class="fa-solid fa-times"></i>';
+                removeBtn.title = 'Remove option';
+                removeBtn.addEventListener('click', () => {
+                    slider.dropdownOptions.splice(optIndex, 1);
+                    renderDropdownOptions();
+                    debouncedRender();
+                    debouncedSaveSettings();
+                });
+
+                row.appendChild(keyInput);
+                row.appendChild(arrow);
+                row.appendChild(valueInput);
+                row.appendChild(removeBtn);
+                dropdownOptionsContainer.appendChild(row);
+            });
+        };
+
+        renderDropdownOptions();
+
+        if (addDropdownOptionButton) {
+            addDropdownOptionButton.addEventListener('click', () => {
+                slider.dropdownOptions.push({ key: '', value: '' });
+                renderDropdownOptions();
+                debouncedSaveSettings();
+            });
+        }
+
+        // Color format change handler
+        if (colorFormatSelect) {
+            colorFormatSelect.addEventListener('change', () => {
+                slider.colorFormat = colorFormatSelect.value as 'hex' | 'rgb' | 'hsv';
+                debouncedRender();
+                debouncedSaveSettings();
+            });
+        }
+
+        // Default color handler
+        if (defaultColorInput) {
+            defaultColorInput.addEventListener('input', () => {
+                slider.value = defaultColorInput.value;
+                debouncedRender();
+                debouncedSaveSettings();
+            });
+        }
+
+        // Checkbox value handlers
+        if (checkboxTrueValueInput) {
+            checkboxTrueValueInput.addEventListener('input', () => {
+                slider.checkboxTrueValue = checkboxTrueValueInput.value;
+                debouncedRender();
+                debouncedSaveSettings();
+            });
+        }
+
+        if (checkboxFalseValueInput) {
+            checkboxFalseValueInput.addEventListener('input', () => {
+                slider.checkboxFalseValue = checkboxFalseValueInput.value;
+                debouncedRender();
+                debouncedSaveSettings();
+            });
+        }
+
+        if (defaultCheckboxSelect) {
+            defaultCheckboxSelect.addEventListener('change', () => {
+                slider.value = defaultCheckboxSelect.value === 'true';
+                debouncedRender();
+                debouncedSaveSettings();
+            });
+        }
 
         // Initial update
         updateVisibility();
@@ -613,7 +764,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
             completionPromptManager.insertBefore(drawer, completionPromptManager.firstChild);
         }
     } else {
-        // If the target container doesn't exist yet, we don't attach the drawer. 
+        // If the target container doesn't exist yet, we don't attach the drawer.
         // The MutationObserver will call this again when it appears.
     }
 
@@ -750,7 +901,6 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
         // --- MultiSelect Slider Logic ---
         else if (slider.type === 'MultiSelect') {
-            const rangeContainer = renderer.content.querySelector('.range-block-range') as HTMLDivElement;
             const counterContainer = renderer.content.querySelector('.range-block-counter') as HTMLDivElement;
             const sliderInput = renderer.content.querySelector('input[type="range"]') as HTMLInputElement;
             const numberInput = renderer.content.querySelector('input[type="number"]') as HTMLInputElement;
@@ -804,6 +954,156 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
             $(sliderInput).on('input', inputEventListener);
         }
 
+        // --- Dropdown Logic ---
+        else if (slider.type === 'Dropdown') {
+            const rangeContainer = renderer.content.querySelector('.range-block-range') as HTMLDivElement;
+            const counterContainer = renderer.content.querySelector('.range-block-counter') as HTMLDivElement;
+
+            // Ensure we have options
+            const validOptions = (slider.dropdownOptions || []).filter(o => o.key.trim() !== '');
+            if (validOptions.length < 1) {
+                titleElement.textContent += ' (Config Error: No Options)';
+                return;
+            }
+
+            // Hide the range slider, use a select dropdown instead
+            if (rangeContainer) {
+                rangeContainer.innerHTML = '';
+                rangeContainer.style.flex = '1';
+
+                const selectElement = document.createElement('select');
+                selectElement.id = sliderId;
+                selectElement.className = 'text_pole slider_macros_dropdown_select';
+
+                validOptions.forEach((opt) => {
+                    const optionEl = document.createElement('option');
+                    optionEl.value = opt.key;
+                    optionEl.textContent = opt.key;
+                    if (slider.value === opt.key) {
+                        optionEl.selected = true;
+                    }
+                    selectElement.appendChild(optionEl);
+                });
+
+                // Set default if no value
+                if (!slider.value || !validOptions.find(o => o.key === slider.value)) {
+                    slider.value = validOptions[0].key;
+                    selectElement.value = validOptions[0].key;
+                }
+
+                selectElement.addEventListener('change', () => {
+                    slider.value = selectElement.value;
+                    saveSettingsDebounced();
+                    updateSliderMacros(settings);
+                });
+
+                rangeContainer.appendChild(selectElement);
+            }
+
+            // Hide the counter
+            if (counterContainer) {
+                counterContainer.style.display = 'none';
+            }
+        }
+
+        // --- Color Picker Logic ---
+        else if (slider.type === 'Color') {
+            const rangeContainer = renderer.content.querySelector('.range-block-range') as HTMLDivElement;
+            const counterContainer = renderer.content.querySelector('.range-block-counter') as HTMLDivElement;
+
+            // Hide the range slider, use color input instead
+            if (rangeContainer) {
+                rangeContainer.innerHTML = '';
+                rangeContainer.style.flex = '1';
+                rangeContainer.style.display = 'flex';
+                rangeContainer.style.alignItems = 'center';
+                rangeContainer.style.gap = '10px';
+
+                const colorInput = document.createElement('input');
+                colorInput.type = 'color';
+                colorInput.id = sliderId;
+                colorInput.className = 'slider_macros_color_input';
+                colorInput.value = typeof slider.value === 'string' && slider.value.startsWith('#') ? slider.value : '#ffffff';
+
+                const hexDisplay = document.createElement('input');
+                hexDisplay.type = 'text';
+                hexDisplay.className = 'text_pole slider_macros_color_hex';
+                hexDisplay.value = colorInput.value.toUpperCase();
+                hexDisplay.maxLength = 7;
+
+                const updateFromColor = () => {
+                    slider.value = colorInput.value;
+                    hexDisplay.value = colorInput.value.toUpperCase();
+                    saveSettingsDebounced();
+                    updateSliderMacros(settings);
+                };
+
+                const updateFromHex = () => {
+                    let hex = hexDisplay.value.trim();
+                    if (!hex.startsWith('#')) hex = '#' + hex;
+                    if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+                        colorInput.value = hex;
+                        slider.value = hex;
+                        saveSettingsDebounced();
+                        updateSliderMacros(settings);
+                    }
+                };
+
+                colorInput.addEventListener('input', updateFromColor);
+                hexDisplay.addEventListener('change', updateFromHex);
+
+                rangeContainer.appendChild(colorInput);
+                rangeContainer.appendChild(hexDisplay);
+            }
+
+            // Hide the counter
+            if (counterContainer) {
+                counterContainer.style.display = 'none';
+            }
+        }
+
+        // --- Checkbox Logic ---
+        else if (slider.type === 'Checkbox') {
+            const rangeContainer = renderer.content.querySelector('.range-block-range') as HTMLDivElement;
+            const counterContainer = renderer.content.querySelector('.range-block-counter') as HTMLDivElement;
+
+            // Hide the range slider, use checkbox instead
+            if (rangeContainer) {
+                rangeContainer.innerHTML = '';
+                rangeContainer.style.flex = '1';
+                rangeContainer.style.display = 'flex';
+                rangeContainer.style.alignItems = 'center';
+
+                const checkboxLabel = document.createElement('label');
+                checkboxLabel.className = 'checkbox_label slider_macros_checkbox_label';
+
+                const checkboxInput = document.createElement('input');
+                checkboxInput.type = 'checkbox';
+                checkboxInput.id = sliderId;
+                checkboxInput.checked = slider.value === true;
+
+                const checkboxText = document.createElement('span');
+                checkboxText.className = 'slider_macros_checkbox_text';
+                checkboxText.textContent = slider.value === true ? (slider.checkboxTrueValue || 'true') : (slider.checkboxFalseValue || 'false');
+
+                checkboxInput.addEventListener('change', () => {
+                    slider.value = checkboxInput.checked;
+                    checkboxText.textContent = checkboxInput.checked ? (slider.checkboxTrueValue || 'true') : (slider.checkboxFalseValue || 'false');
+                    saveSettingsDebounced();
+                    updateSliderMacros(settings);
+                });
+
+                checkboxLabel.appendChild(checkboxInput);
+                checkboxLabel.appendChild(checkboxText);
+                rangeContainer.appendChild(checkboxLabel);
+            }
+
+            // Hide the counter
+            if (counterContainer) {
+                counterContainer.style.display = 'none';
+            }
+        }
+
         container.appendChild(renderer.content);
     });
 
@@ -855,10 +1155,30 @@ function updateSliderMacros(settings: ExtensionSettings) {
 
         if (slider.type === 'MultiSelect') {
             const validOptions = (slider.options || []).filter(o => o.trim() !== '');
-            macroHandler = () => validOptions[slider.value] || '';
+            macroHandler = () => validOptions[slider.value as number] || '';
         } else if (slider.type === 'Boolean') {
             // 1 = True, 0 = False
             macroHandler = () => (slider.value === 1 ? 'true' : 'false');
+        } else if (slider.type === 'Dropdown') {
+            // Dropdown: value is the selected key, output is the mapped value
+            macroHandler = () => {
+                const selectedKey = slider.value as string;
+                const option = (slider.dropdownOptions || []).find(o => o.key === selectedKey);
+                return option ? option.value : selectedKey;
+            };
+        } else if (slider.type === 'Color') {
+            // Color: convert hex to the configured format
+            macroHandler = () => {
+                const hex = (slider.value as string) || '#ffffff';
+                return formatColor(hex, slider.colorFormat || 'hex');
+            };
+        } else if (slider.type === 'Checkbox') {
+            // Checkbox: output configured true/false values
+            macroHandler = () => {
+                return slider.value === true
+                    ? (slider.checkboxTrueValue || 'true')
+                    : (slider.checkboxFalseValue || 'false');
+            };
         } else {
             macroHandler = () => slider.value.toString();
         }
@@ -874,7 +1194,55 @@ function updateSliderMacros(settings: ExtensionSettings) {
             MacrosParser.registerMacro(slider.property, macroHandler, description);
         }
     });
-};
+}
+
+// Color format conversion utilities
+function formatColor(hex: string, format: 'hex' | 'rgb' | 'hsv'): string {
+    // Ensure valid hex
+    if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) {
+        hex = '#ffffff';
+    }
+
+    if (format === 'hex') {
+        return hex.toUpperCase();
+    }
+
+    // Parse hex to RGB
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+
+    if (format === 'rgb') {
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    // Convert RGB to HSV
+    const rNorm = r / 255;
+    const gNorm = g / 255;
+    const bNorm = b / 255;
+
+    const max = Math.max(rNorm, gNorm, bNorm);
+    const min = Math.min(rNorm, gNorm, bNorm);
+    const delta = max - min;
+
+    let h = 0;
+    if (delta !== 0) {
+        if (max === rNorm) {
+            h = ((gNorm - bNorm) / delta) % 6;
+        } else if (max === gNorm) {
+            h = (bNorm - rNorm) / delta + 2;
+        } else {
+            h = (rNorm - gNorm) / delta + 4;
+        }
+        h = Math.round(h * 60);
+        if (h < 0) h += 360;
+    }
+
+    const s = max === 0 ? 0 : Math.round((delta / max) * 100);
+    const v = Math.round(max * 100);
+
+    return `hsv(${h}, ${s}%, ${v}%)`;
+}
 
 
 // Preset binding event handler without the chat completion body append stuff.
