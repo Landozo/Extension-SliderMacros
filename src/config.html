@@ -63,6 +63,35 @@
                 <!-- Group options populated dynamically -->
             </select>
         </div>
+        <!-- Variable Binding Options -->
+        <div class="slider_macros_type_section">
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Initial Value from Variable <span class="slider_macros_optional">(optional)</span></label>
+                <div class="slider_macros_variable_input_row">
+                    <select class="text_pole slider_macros_variable_scope" name="variableScope">
+                        <option value="local">Local</option>
+                        <option value="global">Global</option>
+                    </select>
+                    <div class="slider_macros_variable_input">
+                        <input class="text_pole" type="text" name="variableSource" placeholder="variable name">
+                    </div>
+                    <button class="menu_button menu_button_icon slider_macros_btn_search_variable" name="searchVariable" type="button" title="Search variables">
+                        <i class="fa-solid fa-search"></i>
+                    </button>
+                    <button class="menu_button menu_button_icon slider_macros_btn_load_variable" name="loadVariable" type="button" title="Load value from variable now">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                </div>
+                <div class="slider_macros_variable_status" name="variableStatus"></div>
+            </div>
+            <div class="slider_macros_field">
+                <label class="checkbox_label slider_macros_sync_toggle">
+                    <input type="checkbox" name="syncToVariable">
+                    <span>Sync changes back to variable</span>
+                </label>
+                <div class="slider_macros_sync_hint">When enabled, slider changes will update the variable value</div>
+            </div>
+        </div>
         <!-- Numeric options -->
         <div class="numeric-only slider_macros_type_section">
             <div class="slider_macros_field_row">
@@ -163,6 +192,10 @@
         </div>
         <!-- Delete action at bottom of expanded view -->
         <div class="slider_macros_card_delete_row">
+            <button class="menu_button menu_button_icon slider_macros_btn_duplicate" name="duplicate" type="button">
+                <i class="fa-solid fa-copy"></i>
+                <span>Duplicate</span>
+            </button>
             <button class="menu_button menu_button_icon slider_macros_btn_danger_full" name="delete" type="button">
                 <i class="fa-solid fa-trash-alt"></i>
                 <span>Delete Slider</span>

@@ -10,7 +10,7 @@ import groupTemplate from './group.html';
 // import { MacrosParser } from '../../../../macros.js';
 // import { MacroCategory } from '../../../../macros/engine/MacroRegistry';
 
-const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser, substituteParams } = (SillyTavern.getContext() as any);
+const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser, substituteParams, variables } = (SillyTavern.getContext() as any);
 
 const MODULE_NAME = 'sliderMacros';
 const DEBOUNCE_DELAY = 300;
@@ -40,8 +40,16 @@ const createDebouncedRender = (settings: ExtensionSettings) => debounce(() => re
 interface MacroInfo {
     name: string;
     description: string;
-    source: 'v2' | 'legacy';
-    category?: string;
+    source: 'v2' | 'legacy' | 'extension' | 'core' | 'variable';
+    sourceName: string;
+    category: string;
+    minArgs: number;
+    isProtected: boolean;
+    def?: unknown;
+    // Variable-specific fields
+    isVariable?: boolean;
+    variableScope?: 'local' | 'global';
+    variableValue?: unknown;
 }
 
 /**
@@ -115,65 +123,215 @@ function hasMacro(macroName: string): boolean {
 }
 
 /**
- * Lists all known macros from both systems.
- * Prefers the 2.0 registry for metadata, falls back to legacy.
+ * Lists all known macros from both systems with rich metadata.
+ * Normalizes data structure for consistent filtering and identifies protected core macros.
  * @returns Array of macro info objects
  */
 function getAllKnownMacros(): MacroInfo[] {
     const macroMap = new Map<string, MacroInfo>();
 
-    // 1. Add everything from the New Registry (Preferred source)
+    // 1. Add everything from the New Registry (Rich metadata)
+    // When Experimental is ON, this already includes Legacy macros.
     if (macros?.registry?.getAllMacros) {
         try {
             const newMacros = macros.registry.getAllMacros({ excludeHiddenAliases: true });
             for (const macro of newMacros) {
+                // Calculate total minimum required arguments
+                const minArgs = (macro.minArgs || 0) + (macro.list?.min || 0);
+                // Protected check: Core macros are protected
+                const isProtected = !macro.source?.isExtension;
+
                 macroMap.set(macro.name, {
                     name: macro.name,
                     description: macro.description || '',
-                    source: 'v2',
-                    category: macro.category,
+                    source: macro.source?.isExtension ? 'extension' : 'core',
+                    sourceName: macro.source?.name || 'unknown',
+                    category: macro.category || 'unknown',
+                    minArgs: minArgs,
+                    isProtected: isProtected,
+                    def: macro,
                 });
             }
+            console.debug(`[SliderMacros] Found ${macroMap.size} macros from v2 registry`);
         } catch (e) {
             console.warn('[SliderMacros] Failed to get macros from new registry:', e);
         }
     }
 
-    // 2. Add Legacy macros (Fallback source)
+    // 2. Add Legacy macros (Fallback for when Experimental is OFF)
+    // If Experimental is OFF, the New Registry won't have these, so we grab them here.
+    // Legacy macros are typically registered by extensions, so they are generally NOT protected core macros.
     if (MacrosParser) {
         try {
-            for (const { key, description } of MacrosParser) {
-                if (!macroMap.has(key)) {
-                    macroMap.set(key, {
-                        name: key,
-                        description: description || '',
-                        source: 'legacy',
-                    });
+            let legacyCount = 0;
+            // Direct iteration (MacrosParser is iterable)
+            if (typeof MacrosParser[Symbol.iterator] === 'function') {
+                for (const item of MacrosParser) {
+                    const key = item.key || item.name;
+                    const description = item.description || '';
+                    if (key && !macroMap.has(key)) {
+                        macroMap.set(key, {
+                            name: key,
+                            description: description,
+                            source: 'legacy',
+                            sourceName: 'unknown (legacy)',
+                            category: 'legacy',
+                            // NORMALIZATION: Legacy macros are strictly {{key}} replacements.
+                            // They do not support standard engine arguments, so we treat them as 0-arg.
+                            minArgs: 0,
+                            // NORMALIZATION: Legacy macros are usually external/custom, so not protected.
+                            isProtected: false,
+                            def: null,
+                        });
+                        legacyCount++;
+                    }
                 }
             }
+            console.debug(`[SliderMacros] Found ${legacyCount} additional macros from legacy parser`);
         } catch (e) {
             console.warn('[SliderMacros] Failed to get macros from legacy parser:', e);
         }
     }
 
+    console.debug(`[SliderMacros] Total macros available: ${macroMap.size}`);
     return Array.from(macroMap.values());
 }
 
 /**
- * Searches macros by name or description.
+ * Gets all known variables from both local and global scopes.
+ * @returns Array of MacroInfo objects representing variables
+ */
+function getAllKnownVariables(): MacroInfo[] {
+    const variableList: MacroInfo[] = [];
+
+    if (!variables) {
+        console.debug('[SliderMacros] Variables API not available');
+        return variableList;
+    }
+
+    // Get local variables
+    try {
+        if (variables.local?.keys) {
+            const localKeys = variables.local.keys();
+            for (const key of localKeys) {
+                const value = variables.local.get(key);
+                variableList.push({
+                    name: key,
+                    description: `Local variable`,
+                    source: 'variable',
+                    sourceName: 'local',
+                    category: 'variable',
+                    minArgs: 0,
+                    isProtected: false,
+                    isVariable: true,
+                    variableScope: 'local',
+                    variableValue: value,
+                });
+            }
+        } else if (variables.local && typeof variables.local[Symbol.iterator] === 'function') {
+            for (const [key, value] of variables.local) {
+                variableList.push({
+                    name: key,
+                    description: `Local variable`,
+                    source: 'variable',
+                    sourceName: 'local',
+                    category: 'variable',
+                    minArgs: 0,
+                    isProtected: false,
+                    isVariable: true,
+                    variableScope: 'local',
+                    variableValue: value,
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('[SliderMacros] Failed to get local variables:', e);
+    }
+
+    // Get global variables
+    try {
+        if (variables.global?.keys) {
+            const globalKeys = variables.global.keys();
+            for (const key of globalKeys) {
+                const value = variables.global.get(key);
+                variableList.push({
+                    name: key,
+                    description: `Global variable`,
+                    source: 'variable',
+                    sourceName: 'global',
+                    category: 'variable',
+                    minArgs: 0,
+                    isProtected: false,
+                    isVariable: true,
+                    variableScope: 'global',
+                    variableValue: value,
+                });
+            }
+        } else if (variables.global && typeof variables.global[Symbol.iterator] === 'function') {
+            for (const [key, value] of variables.global) {
+                variableList.push({
+                    name: key,
+                    description: `Global variable`,
+                    source: 'variable',
+                    sourceName: 'global',
+                    category: 'variable',
+                    minArgs: 0,
+                    isProtected: false,
+                    isVariable: true,
+                    variableScope: 'global',
+                    variableValue: value,
+                });
+            }
+        }
+    } catch (e) {
+        console.warn('[SliderMacros] Failed to get global variables:', e);
+    }
+
+    console.debug(`[SliderMacros] Total variables available: ${variableList.length}`);
+    return variableList;
+}
+
+/**
+ * Gets "simple value" macros that can be overridden by sliders.
+ * Filters out:
+ * 1. Macros that require arguments (like {{getvar::name}})
+ * 2. Utility/Setter macros (like {{noop}}, {{newline}}, {{setvar}})
+ * @returns Filtered array of simple value macros
+ */
+function getSimpleValueMacros(): MacroInfo[] {
+    const allMacros = getAllKnownMacros();
+
+    return allMacros.filter(macro => {
+        // 1. Must be callable without arguments (e.g. {{name}})
+        // This filters out setters like {{setvar::k::v}} and getters like {{getvar::k}}
+        if (macro.minArgs > 0) return false;
+
+        // 2. Exclude Utility category (noop, newline, trim, if, else, etc.)
+        const category = macro.category?.toLowerCase?.() || macro.category;
+        if (category === 'utility' || category === 'UTILITY') return false;
+
+        return true;
+    });
+}
+
+/**
+ * Searches macros and optionally variables by name or description.
+ * Only searches "simple value" macros that can be overridden.
  * @param query - Search query string
  * @param limit - Maximum number of results
+ * @param includeVariables - Whether to include variables in results
  * @returns Filtered array of macro info objects
  */
-function searchMacros(query: string, limit = 20): MacroInfo[] {
-    const allMacros = getAllKnownMacros();
+function searchMacros(query: string, limit = 20, includeVariables = false): MacroInfo[] {
+    const simpleMacros = getSimpleValueMacros();
+    const allItems = includeVariables ? [...simpleMacros, ...getAllKnownVariables()] : simpleMacros;
     const lowerQuery = query.toLowerCase().trim();
 
     if (!lowerQuery) {
-        return allMacros.slice(0, limit);
+        return allItems.slice(0, limit);
     }
 
-    return allMacros
+    return allItems
         .filter(m =>
             m.name.toLowerCase().includes(lowerQuery) ||
             m.description.toLowerCase().includes(lowerQuery)
@@ -182,33 +340,36 @@ function searchMacros(query: string, limit = 20): MacroInfo[] {
 }
 
 /**
- * Shows a popup dialog for searching and selecting existing macros.
+ * Shows a popup dialog for searching and selecting existing macros and optionally variables.
+ * @param includeVariables - Whether to include variables in search results
  * @returns Promise resolving to selected macro info, or null if cancelled
  */
-async function showMacroSearchPopup(): Promise<MacroInfo | null> {
+async function showMacroSearchPopup(includeVariables = false): Promise<MacroInfo | null> {
     return new Promise((resolve) => {
         let selectedMacro: MacroInfo | null = null;
 
         // Build initial HTML
+        const title = includeVariables ? 'Search Macros & Variables' : 'Search Existing Macros';
+        const placeholder = includeVariables ? 'Search macros and variables...' : 'Search macros by name or description...';
         const initialHtml = `
             <div class="slider_macros_search_container">
                 <div class="slider_macros_search_input_row">
-                    <input type="text" class="text_pole slider_macros_search_input" placeholder="Search macros by name or description...">
+                    <input type="text" class="text_pole slider_macros_search_input" placeholder="${placeholder}">
                 </div>
                 <div class="slider_macros_search_results">
-                    <div class="slider_macros_search_empty">Loading macros...</div>
+                    <div class="slider_macros_search_empty">Loading...</div>
                 </div>
             </div>
         `;
 
         const renderResults = (query: string, resultsContainer: HTMLElement) => {
-            const results = searchMacros(query, 50);
+            const results = searchMacros(query, 50, includeVariables);
             resultsContainer.innerHTML = '';
 
             if (results.length === 0) {
                 const empty = document.createElement('div');
                 empty.className = 'slider_macros_search_empty';
-                empty.textContent = query ? 'No macros found matching your search.' : 'No macros available.';
+                empty.textContent = query ? 'No results found matching your search.' : 'No macros or variables available.';
                 resultsContainer.appendChild(empty);
                 return;
             }
@@ -216,17 +377,50 @@ async function showMacroSearchPopup(): Promise<MacroInfo | null> {
             results.forEach(macro => {
                 const resultItem = document.createElement('div');
                 resultItem.className = 'slider_macros_search_result';
+                if (macro.isProtected) {
+                    resultItem.classList.add('protected');
+                }
+                if (macro.isVariable) {
+                    resultItem.classList.add('variable');
+                }
 
                 const nameRow = document.createElement('div');
+                nameRow.className = 'slider_macros_search_result_header';
+
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'slider_macros_search_result_name';
-                nameSpan.textContent = `{{${macro.name}}}`;
+                // Variables don't use {{}} syntax in display
+                nameSpan.textContent = macro.isVariable ? macro.name : `{{${macro.name}}}`;
                 nameRow.appendChild(nameSpan);
 
+                // Source badge (Core/Extension/Legacy/Variable)
                 const sourceSpan = document.createElement('span');
-                sourceSpan.className = `slider_macros_search_result_source ${macro.source === 'legacy' ? 'legacy' : ''}`;
-                sourceSpan.textContent = macro.source === 'v2' ? '2.0' : 'Legacy';
+                let sourceClass = 'extension';
+                let sourceText = macro.sourceName || 'Extension';
+
+                if (macro.isVariable) {
+                    sourceClass = 'variable';
+                    sourceText = macro.variableScope === 'global' ? 'Global Var' : 'Local Var';
+                } else if (macro.source === 'core') {
+                    sourceClass = 'core';
+                    sourceText = 'Core';
+                } else if (macro.source === 'legacy') {
+                    sourceClass = 'legacy';
+                    sourceText = 'Legacy';
+                }
+
+                sourceSpan.className = `slider_macros_search_result_source ${sourceClass}`;
+                sourceSpan.textContent = sourceText;
                 nameRow.appendChild(sourceSpan);
+
+                // Protected badge
+                if (macro.isProtected) {
+                    const protectedSpan = document.createElement('span');
+                    protectedSpan.className = 'slider_macros_search_result_protected';
+                    protectedSpan.textContent = 'Protected';
+                    protectedSpan.title = 'This is a core macro. Overriding it may cause unexpected behavior.';
+                    nameRow.appendChild(protectedSpan);
+                }
 
                 resultItem.appendChild(nameRow);
 
@@ -239,8 +433,17 @@ async function showMacroSearchPopup(): Promise<MacroInfo | null> {
 
                 // Show current value
                 try {
-                    const currentValue = getMacroValue(macro.name);
-                    if (currentValue !== `{{${macro.name}}}`) {
+                    let currentValue: string;
+                    if (macro.isVariable) {
+                        currentValue = String(macro.variableValue ?? '');
+                    } else {
+                        currentValue = getMacroValue(macro.name);
+                        if (currentValue === `{{${macro.name}}}`) {
+                            currentValue = '';
+                        }
+                    }
+
+                    if (currentValue) {
                         const valueSpan = document.createElement('div');
                         valueSpan.className = 'slider_macros_search_result_value';
                         const displayValue = currentValue.length > 50 ? currentValue.substring(0, 50) + '...' : currentValue;
@@ -263,7 +466,7 @@ async function showMacroSearchPopup(): Promise<MacroInfo | null> {
         };
 
         // Show popup
-        Popup.show.confirm('Search Existing Macros', initialHtml, {
+        Popup.show.confirm(title, initialHtml, {
             okButton: 'Select',
             cancelButton: 'Cancel',
         }).then((confirmed: boolean) => {
@@ -303,6 +506,196 @@ async function showMacroSearchPopup(): Promise<MacroInfo | null> {
 // End Universal Macro System Handler
 // ============================================================================
 
+// ============================================================================
+// Variables API Helpers
+// ============================================================================
+
+/**
+ * Gets a variable value using the direct variables API.
+ * Preferred over macro evaluation for variables to avoid parsing overhead.
+ * @param name - Variable name (without getvar:: prefix)
+ * @param scope - 'local' or 'global' (default: 'local')
+ * @returns The variable value, or undefined if not set
+ */
+function getVariableValue(name: string, scope: 'local' | 'global' = 'local'): unknown {
+    if (!variables) {
+        console.warn('[SliderMacros] Variables API not available');
+        return undefined;
+    }
+
+    try {
+        const varScope = scope === 'global' ? variables.global : variables.local;
+        if (varScope?.get) {
+            return varScope.get(name);
+        }
+    } catch (e) {
+        console.warn(`[SliderMacros] Failed to get variable "${name}":`, e);
+    }
+    return undefined;
+}
+
+/**
+ * Sets a variable value using the direct variables API.
+ * Preferred over macro evaluation for variables.
+ * @param name - Variable name (without setvar:: prefix)
+ * @param value - The value to set (any type supported)
+ * @param scope - 'local' or 'global' (default: 'local')
+ * @returns True if successful
+ */
+function setVariableValue(name: string, value: unknown, scope: 'local' | 'global' = 'local'): boolean {
+    if (!variables) {
+        console.warn('[SliderMacros] Variables API not available');
+        return false;
+    }
+
+    try {
+        const varScope = scope === 'global' ? variables.global : variables.local;
+        if (varScope?.set) {
+            varScope.set(name, value);
+            return true;
+        }
+    } catch (e) {
+        console.warn(`[SliderMacros] Failed to set variable "${name}":`, e);
+    }
+    return false;
+}
+
+/**
+ * Checks if a variable exists.
+ * @param name - Variable name
+ * @param scope - 'local' or 'global' (default: 'local')
+ * @returns True if the variable exists
+ */
+function hasVariable(name: string, scope: 'local' | 'global' = 'local'): boolean {
+    if (!variables) return false;
+
+    try {
+        const varScope = scope === 'global' ? variables.global : variables.local;
+        if (varScope?.has) {
+            return varScope.has(name);
+        }
+    } catch (e) {
+        console.warn(`[SliderMacros] Failed to check variable "${name}":`, e);
+    }
+    return false;
+}
+
+/**
+ * Evaluates a string that may contain nested macros.
+ * For Macros 2.0: Uses engine.evaluate() which handles nesting natively.
+ * For Legacy: Uses substituteParams() which may need multiple passes for deep nesting.
+ * @param template - String potentially containing macro syntax (e.g., "{{pick::A::B}}")
+ * @returns The evaluated result
+ */
+function evaluateNestedMacros(template: string): string {
+    if (!template || !template.includes('{{')) {
+        return template;
+    }
+
+    // 1. If experimental engine is enabled, use native nested evaluation
+    if (power_user?.experimental_macro_engine && macros?.engine) {
+        try {
+            const env = macros.envBuilder?.buildFromRawEnv({});
+            if (env) {
+                return macros.engine.evaluate(template, env);
+            }
+        } catch (e) {
+            console.warn('[SliderMacros] Failed to evaluate nested macros with 2.0 engine:', e);
+        }
+    }
+
+    // 2. Legacy fallback: Use substituteParams with multiple passes for nested macros
+    if (typeof substituteParams === 'function') {
+        let result = template;
+        let prevResult = '';
+        let maxIterations = 5; // Prevent infinite loops
+
+        // Keep substituting until no more changes or max iterations
+        while (result !== prevResult && maxIterations > 0) {
+            prevResult = result;
+            result = substituteParams(result);
+            maxIterations--;
+        }
+
+        return result;
+    }
+
+    return template;
+}
+
+/**
+ * Sets a variable to the evaluated result of a macro template.
+ * Evaluates nested macros first, then sets the final value.
+ * @param varName - Variable name to set
+ * @param template - Template string (may contain nested macros)
+ * @param scope - 'local' or 'global'
+ * @returns The evaluated value that was set
+ */
+function setVariableFromTemplate(varName: string, template: string, scope: 'local' | 'global' = 'local'): string {
+    const evaluatedValue = evaluateNestedMacros(template);
+    setVariableValue(varName, evaluatedValue, scope);
+    return evaluatedValue;
+}
+
+/**
+ * Syncs a slider's value to its bound variable if syncToVariable is enabled.
+ * @param slider - The slider model to sync
+ */
+function syncSliderToVariable(slider: SliderModel): void {
+    if (!slider.syncToVariable || !slider.variableSource) {
+        return;
+    }
+
+    const scope = slider.variableScope || 'local';
+    setVariableValue(slider.variableSource, slider.value, scope);
+    console.debug(`[SliderMacros] Synced slider "${slider.name}" value to ${scope} variable "${slider.variableSource}":`, slider.value);
+}
+
+/**
+ * Loads a slider's initial value from its bound variable if variableSource is set.
+ * @param slider - The slider model to load
+ * @returns True if value was loaded from variable
+ */
+function loadSliderFromVariable(slider: SliderModel): boolean {
+    if (!slider.variableSource) {
+        return false;
+    }
+
+    const scope = slider.variableScope || 'local';
+    const value = getVariableValue(slider.variableSource, scope);
+
+    if (value === undefined) {
+        return false;
+    }
+
+    // Convert value based on slider type
+    if (slider.type === 'Numeric' || !slider.type) {
+        slider.value = Number(value) || 0;
+    } else if (slider.type === 'Boolean') {
+        slider.value = value === true || value === 'true' || value === 1 ? 1 : 0;
+    } else if (slider.type === 'Checkbox') {
+        slider.value = value === true || value === 'true' || value === slider.checkboxTrueValue;
+    } else if (slider.type === 'Color') {
+        slider.value = String(value).startsWith('#') ? String(value) : '#ffffff';
+    } else if (slider.type === 'MultiSelect') {
+        // Try to find matching option index
+        const validOptions = (slider.options || []).filter(o => o.trim() !== '');
+        const idx = validOptions.indexOf(String(value));
+        slider.value = idx >= 0 ? idx : (Number(value) || 0);
+    } else if (slider.type === 'Dropdown') {
+        slider.value = String(value);
+    } else {
+        slider.value = String(value);
+    }
+
+    console.debug(`[SliderMacros] Loaded slider "${slider.name}" value from ${scope} variable "${slider.variableSource}":`, slider.value);
+    return true;
+}
+
+// ============================================================================
+// End Variables API Helpers
+// ============================================================================
+
 interface ChatCompletionRequestData {
     chat_completion_source: string;
     custom_include_body: string;
@@ -332,6 +725,10 @@ interface SliderModel {
     checkboxFalseValue: string;
     groupId: string | null;
     order: number;
+    // Variable binding fields
+    variableSource: string;
+    variableScope: 'local' | 'global';
+    syncToVariable: boolean;
 }
 
 interface SliderGroup {
@@ -435,6 +832,16 @@ export function getSettings(): ExtensionSettings {
                 slider.order = maxSliderOrder;
             } else {
                 maxSliderOrder = Math.max(maxSliderOrder, slider.order);
+            }
+            // Migration: Add variable binding fields
+            if (slider.variableSource === undefined) {
+                slider.variableSource = '';
+            }
+            if (slider.variableScope === undefined) {
+                slider.variableScope = 'local';
+            }
+            if (slider.syncToVariable === undefined) {
+                slider.syncToVariable = false;
             }
         }
     }
@@ -657,6 +1064,9 @@ function createSlider(): void {
         checkboxFalseValue: 'false',
         groupId: null,
         order: getNextOrder(activeCollection),
+        variableSource: '',
+        variableScope: 'local',
+        syncToVariable: false,
     });
 
     saveSettingsDebounced();
@@ -990,7 +1400,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             debouncedSaveSettings();
         });
 
-        // Macro status indicator - shows if macro already exists
+        // Macro status indicator - shows if macro already exists and if it's protected
         const updateMacroStatus = () => {
             if (!macroStatusElement) return;
             const macroName = propertyInput.value.trim();
@@ -999,7 +1409,24 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                 macroStatusElement.className = 'slider_macros_macro_status';
                 return;
             }
-            if (hasMacro(macroName)) {
+
+            // Find macro info to check if protected
+            const allMacros = getAllKnownMacros();
+            const macroInfo = allMacros.find(m => m.name === macroName);
+
+            if (macroInfo) {
+                const currentValue = getMacroValue(macroName);
+                const displayValue = currentValue.length > 30 ? currentValue.substring(0, 30) + '...' : currentValue;
+
+                if (macroInfo.isProtected) {
+                    macroStatusElement.textContent = `⚠ Overrides PROTECTED core macro (current: ${displayValue})`;
+                    macroStatusElement.className = 'slider_macros_macro_status protected';
+                } else {
+                    macroStatusElement.textContent = `Overrides existing macro (current: ${displayValue})`;
+                    macroStatusElement.className = 'slider_macros_macro_status exists';
+                }
+            } else if (hasMacro(macroName)) {
+                // Macro exists but not found in our list (edge case)
                 const currentValue = getMacroValue(macroName);
                 const displayValue = currentValue.length > 30 ? currentValue.substring(0, 30) + '...' : currentValue;
                 macroStatusElement.textContent = `Overrides existing macro (current: ${displayValue})`;
@@ -1034,6 +1461,152 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                     renderCompletionSliders(settings);
                     saveSettingsDebounced();
                 }
+            });
+        }
+
+        // Variable binding elements
+        const variableSourceInput = renderer.content.querySelector('input[name="variableSource"]') as HTMLInputElement;
+        const variableScopeSelect = renderer.content.querySelector('select[name="variableScope"]') as HTMLSelectElement;
+        const syncToVariableCheckbox = renderer.content.querySelector('input[name="syncToVariable"]') as HTMLInputElement;
+        const searchVariableButton = renderer.content.querySelector('button[name="searchVariable"]') as HTMLButtonElement;
+        const loadVariableButton = renderer.content.querySelector('button[name="loadVariable"]') as HTMLButtonElement;
+        const variableStatusElement = renderer.content.querySelector('.slider_macros_variable_status') as HTMLDivElement;
+
+        // Set initial values for variable binding
+        if (variableSourceInput) variableSourceInput.value = slider.variableSource || '';
+        if (variableScopeSelect) variableScopeSelect.value = slider.variableScope || 'local';
+        if (syncToVariableCheckbox) syncToVariableCheckbox.checked = slider.syncToVariable || false;
+
+        // Variable status update function
+        const updateVariableStatus = () => {
+            if (!variableStatusElement) return;
+            const varName = variableSourceInput?.value.trim() || '';
+            const scope = variableScopeSelect?.value as 'local' | 'global' || 'local';
+
+            if (!varName) {
+                variableStatusElement.textContent = '';
+                variableStatusElement.className = 'slider_macros_variable_status';
+                return;
+            }
+
+            if (hasVariable(varName, scope)) {
+                const currentValue = getVariableValue(varName, scope);
+                const displayValue = String(currentValue).length > 30 ? String(currentValue).substring(0, 30) + '...' : String(currentValue);
+                variableStatusElement.textContent = `Variable found (current: ${displayValue})`;
+                variableStatusElement.className = 'slider_macros_variable_status found';
+            } else {
+                variableStatusElement.textContent = 'Variable not found';
+                variableStatusElement.className = 'slider_macros_variable_status not-found';
+            }
+        };
+
+        // Initial variable status check
+        updateVariableStatus();
+
+        // Variable source input handler
+        if (variableSourceInput) {
+            variableSourceInput.addEventListener('input', () => {
+                slider.variableSource = variableSourceInput.value;
+                updateVariableStatus();
+                debouncedSaveSettings();
+            });
+        }
+
+        // Variable scope select handler
+        if (variableScopeSelect) {
+            variableScopeSelect.addEventListener('change', () => {
+                slider.variableScope = variableScopeSelect.value as 'local' | 'global';
+                updateVariableStatus();
+                debouncedSaveSettings();
+            });
+        }
+
+        // Sync to variable checkbox handler
+        if (syncToVariableCheckbox) {
+            syncToVariableCheckbox.addEventListener('change', () => {
+                slider.syncToVariable = syncToVariableCheckbox.checked;
+                debouncedSaveSettings();
+            });
+        }
+
+        // Load variable button - loads current value from variable into slider
+        if (loadVariableButton) {
+            loadVariableButton.addEventListener('click', () => {
+                const varName = variableSourceInput?.value.trim() || '';
+                const scope = variableScopeSelect?.value as 'local' | 'global' || 'local';
+
+                if (!varName) {
+                    Popup.show.confirm('No Variable', 'Please enter a variable name first.');
+                    return;
+                }
+
+                const value = getVariableValue(varName, scope);
+                if (value !== undefined) {
+                    // Convert value based on slider type
+                    if (slider.type === 'Numeric') {
+                        slider.value = Number(value) || 0;
+                    } else if (slider.type === 'Boolean') {
+                        slider.value = value === true || value === 'true' || value === 1 ? 1 : 0;
+                    } else if (slider.type === 'Checkbox') {
+                        slider.value = value === true || value === 'true' || value === slider.checkboxTrueValue;
+                    } else if (slider.type === 'Color') {
+                        slider.value = String(value).startsWith('#') ? String(value) : '#ffffff';
+                        if (defaultColorInput) defaultColorInput.value = slider.value as string;
+                    } else {
+                        slider.value = String(value);
+                    }
+                    renderCompletionSliders(settings);
+                    saveSettingsDebounced();
+                    updateVariableStatus();
+                } else {
+                    Popup.show.confirm('Variable Not Found', `Variable "${varName}" not found in ${scope} scope.`);
+                }
+            });
+        }
+
+        // Search variable button - opens popup to search and select variables
+        if (searchVariableButton) {
+            searchVariableButton.addEventListener('click', async () => {
+                const selectedItem = await showMacroSearchPopup(true); // true = include variables
+                if (selectedItem && selectedItem.isVariable) {
+                    if (variableSourceInput) variableSourceInput.value = selectedItem.name;
+                    if (variableScopeSelect) variableScopeSelect.value = selectedItem.variableScope || 'local';
+                    slider.variableSource = selectedItem.name;
+                    slider.variableScope = selectedItem.variableScope as 'local' | 'global' || 'local';
+                    updateVariableStatus();
+                    saveSettingsDebounced();
+                } else if (selectedItem) {
+                    // Selected a macro, fill in property field instead
+                    propertyInput.value = selectedItem.name;
+                    slider.property = selectedItem.name;
+                    cardMacroDisplay.textContent = selectedItem.name;
+                    updateMacroStatus();
+                    saveSettingsDebounced();
+                }
+            });
+        }
+
+        // Duplicate button
+        const duplicateButton = renderer.content.querySelector('button[name="duplicate"]') as HTMLButtonElement;
+        if (duplicateButton) {
+            duplicateButton.addEventListener('click', () => {
+                const activeCollection = settings.collections.find(c => c.active);
+                if (!activeCollection) return;
+
+                // Deep clone the slider
+                const newSlider: SliderModel = {
+                    ...slider,
+                    name: `${slider.name} Copy`,
+                    property: '', // Leave macro empty for user to set
+                    order: getNextOrder(activeCollection),
+                    // Clone arrays/objects to avoid shared references
+                    options: [...(slider.options || [])],
+                    dropdownOptions: (slider.dropdownOptions || []).map(o => ({ ...o })),
+                };
+
+                activeCollection.sliders.push(newSlider);
+                renderSliderConfigs(settings);
+                saveSettingsDebounced();
             });
         }
 
@@ -1490,6 +2063,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
             const inputEventListener = () => {
                 slider.value = parseFloat(sliderInput.value);
                 numberInput.value = sliderInput.value;
+                syncSliderToVariable(slider);
                 saveSettingsDebounced();
                 updateSliderMacros(settings);
             };
@@ -1542,6 +2116,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
                 (slider.value as any) = isTrue ? 1 : 0;
                 valueDisplay.textContent = isTrue ? 'True' : 'False';
 
+                syncSliderToVariable(slider);
                 saveSettingsDebounced();
                 updateSliderMacros(settings);
             };
@@ -1597,6 +2172,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
                 const text = validOptions[index] || '';
                 valueDisplay.textContent = formatOption(text);
                 valueDisplay.title = text;
+                syncSliderToVariable(slider);
                 saveSettingsDebounced();
                 updateSliderMacros(settings);
             };
@@ -1644,6 +2220,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
                 selectElement.addEventListener('change', () => {
                     slider.value = selectElement.value;
+                    syncSliderToVariable(slider);
                     saveSettingsDebounced();
                     updateSliderMacros(settings);
                 });
@@ -1685,6 +2262,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
                 const updateFromColor = () => {
                     slider.value = colorInput.value;
                     hexDisplay.value = colorInput.value.toUpperCase();
+                    syncSliderToVariable(slider);
                     saveSettingsDebounced();
                     updateSliderMacros(settings);
                 };
@@ -1695,6 +2273,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
                     if (/^#[0-9A-Fa-f]{6}$/.test(hex)) {
                         colorInput.value = hex;
                         slider.value = hex;
+                        syncSliderToVariable(slider);
                         saveSettingsDebounced();
                         updateSliderMacros(settings);
                     }
@@ -1740,6 +2319,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
                 checkboxInput.addEventListener('change', () => {
                     slider.value = checkboxInput.checked;
                     checkboxText.textContent = checkboxInput.checked ? (slider.checkboxTrueValue || 'true') : (slider.checkboxFalseValue || 'false');
+                    syncSliderToVariable(slider);
                     saveSettingsDebounced();
                     updateSliderMacros(settings);
                 });
