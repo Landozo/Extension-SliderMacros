@@ -31,7 +31,7 @@
                 <input class="text_pole" type="text" name="name" placeholder="e.g. Temperature">
             </div>
             <div class="slider_macros_field">
-                <label class="slider_macros_label">Macro Variable</label>
+                <label class="slider_macros_label">Macro Name</label>
                 <div class="slider_macros_macro_input_row">
                     <div class="slider_macros_macro_input">
                         <span class="slider_macros_macro_prefix">{{</span>
@@ -63,33 +63,24 @@
                 <!-- Group options populated dynamically -->
             </select>
         </div>
-        <!-- Variable Binding Options -->
+        <!-- Variable Sync Options -->
         <div class="slider_macros_type_section">
             <div class="slider_macros_field">
-                <label class="slider_macros_label">Initial Value from Variable <span class="slider_macros_optional">(optional)</span></label>
+                <label class="slider_macros_label">Sync to Variable <span class="slider_macros_optional">(optional)</span></label>
                 <div class="slider_macros_variable_input_row">
-                    <select class="text_pole slider_macros_variable_scope" name="variableScope">
+                    <select class="text_pole slider_macros_variable_scope" name="syncScope">
                         <option value="local">Local</option>
                         <option value="global">Global</option>
                     </select>
                     <div class="slider_macros_variable_input">
-                        <input class="text_pole" type="text" name="variableSource" placeholder="variable name">
+                        <input class="text_pole" type="text" name="syncVariable" placeholder="variable name">
                     </div>
                     <button class="menu_button menu_button_icon slider_macros_btn_search_variable" name="searchVariable" type="button" title="Search variables">
                         <i class="fa-solid fa-search"></i>
                     </button>
-                    <button class="menu_button menu_button_icon slider_macros_btn_load_variable" name="loadVariable" type="button" title="Load value from variable now">
-                        <i class="fa-solid fa-download"></i>
-                    </button>
                 </div>
                 <div class="slider_macros_variable_status" name="variableStatus"></div>
-            </div>
-            <div class="slider_macros_field">
-                <label class="checkbox_label slider_macros_sync_toggle">
-                    <input type="checkbox" name="syncToVariable">
-                    <span>Sync changes back to variable</span>
-                </label>
-                <div class="slider_macros_sync_hint">When enabled, slider changes will update the variable value</div>
+                <div class="slider_macros_sync_hint">When set, slider value changes will update this variable (use {{getvar::name}} or {{getglobalvar::name}} in prompts)</div>
             </div>
         </div>
         <!-- Numeric options -->

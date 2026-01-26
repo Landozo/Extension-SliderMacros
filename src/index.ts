@@ -638,58 +638,17 @@ function setVariableFromTemplate(varName: string, template: string, scope: 'loca
 }
 
 /**
- * Syncs a slider's value to its bound variable if syncToVariable is enabled.
+ * Syncs a slider's value to its bound variable if syncVariable is set.
  * @param slider - The slider model to sync
  */
 function syncSliderToVariable(slider: SliderModel): void {
-    if (!slider.syncToVariable || !slider.variableSource) {
+    if (!slider.syncVariable) {
         return;
     }
 
-    const scope = slider.variableScope || 'local';
-    setVariableValue(slider.variableSource, slider.value, scope);
-    console.debug(`[SliderMacros] Synced slider "${slider.name}" value to ${scope} variable "${slider.variableSource}":`, slider.value);
-}
-
-/**
- * Loads a slider's initial value from its bound variable if variableSource is set.
- * @param slider - The slider model to load
- * @returns True if value was loaded from variable
- */
-function loadSliderFromVariable(slider: SliderModel): boolean {
-    if (!slider.variableSource) {
-        return false;
-    }
-
-    const scope = slider.variableScope || 'local';
-    const value = getVariableValue(slider.variableSource, scope);
-
-    if (value === undefined) {
-        return false;
-    }
-
-    // Convert value based on slider type
-    if (slider.type === 'Numeric' || !slider.type) {
-        slider.value = Number(value) || 0;
-    } else if (slider.type === 'Boolean') {
-        slider.value = value === true || value === 'true' || value === 1 ? 1 : 0;
-    } else if (slider.type === 'Checkbox') {
-        slider.value = value === true || value === 'true' || value === slider.checkboxTrueValue;
-    } else if (slider.type === 'Color') {
-        slider.value = String(value).startsWith('#') ? String(value) : '#ffffff';
-    } else if (slider.type === 'MultiSelect') {
-        // Try to find matching option index
-        const validOptions = (slider.options || []).filter(o => o.trim() !== '');
-        const idx = validOptions.indexOf(String(value));
-        slider.value = idx >= 0 ? idx : (Number(value) || 0);
-    } else if (slider.type === 'Dropdown') {
-        slider.value = String(value);
-    } else {
-        slider.value = String(value);
-    }
-
-    console.debug(`[SliderMacros] Loaded slider "${slider.name}" value from ${scope} variable "${slider.variableSource}":`, slider.value);
-    return true;
+    const scope = slider.syncScope || 'local';
+    setVariableValue(slider.syncVariable, slider.value, scope);
+    console.debug(`[SliderMacros] Synced slider "${slider.name}" value to ${scope} variable "${slider.syncVariable}":`, slider.value);
 }
 
 // ============================================================================
@@ -725,10 +684,9 @@ interface SliderModel {
     checkboxFalseValue: string;
     groupId: string | null;
     order: number;
-    // Variable binding fields
-    variableSource: string;
-    variableScope: 'local' | 'global';
-    syncToVariable: boolean;
+    // Variable sync fields
+    syncVariable: string;
+    syncScope: 'local' | 'global';
 }
 
 interface SliderGroup {
@@ -833,15 +791,19 @@ export function getSettings(): ExtensionSettings {
             } else {
                 maxSliderOrder = Math.max(maxSliderOrder, slider.order);
             }
-            // Migration: Add variable binding fields
-            if (slider.variableSource === undefined) {
-                slider.variableSource = '';
-            }
-            if (slider.variableScope === undefined) {
-                slider.variableScope = 'local';
-            }
-            if (slider.syncToVariable === undefined) {
-                slider.syncToVariable = false;
+            // Migration: Add variable sync fields
+            if ((slider as any).syncVariable === undefined) {
+                // Migrate from old field names if they exist
+                slider.syncVariable = (slider as any).variableSource || '';
+                slider.syncScope = (slider as any).variableScope || 'local';
+                // If old syncToVariable was false, clear the syncVariable
+                if ((slider as any).syncToVariable === false) {
+                    slider.syncVariable = '';
+                }
+                // Clean up old fields
+                delete (slider as any).variableSource;
+                delete (slider as any).variableScope;
+                delete (slider as any).syncToVariable;
             }
         }
     }
@@ -1064,9 +1026,8 @@ function createSlider(): void {
         checkboxFalseValue: 'false',
         groupId: null,
         order: getNextOrder(activeCollection),
-        variableSource: '',
-        variableScope: 'local',
-        syncToVariable: false,
+        syncVariable: '',
+        syncScope: 'local',
     });
 
     saveSettingsDebounced();
@@ -1464,24 +1425,21 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             });
         }
 
-        // Variable binding elements
-        const variableSourceInput = renderer.content.querySelector('input[name="variableSource"]') as HTMLInputElement;
-        const variableScopeSelect = renderer.content.querySelector('select[name="variableScope"]') as HTMLSelectElement;
-        const syncToVariableCheckbox = renderer.content.querySelector('input[name="syncToVariable"]') as HTMLInputElement;
+        // Variable sync elements
+        const syncVariableInput = renderer.content.querySelector('input[name="syncVariable"]') as HTMLInputElement;
+        const syncScopeSelect = renderer.content.querySelector('select[name="syncScope"]') as HTMLSelectElement;
         const searchVariableButton = renderer.content.querySelector('button[name="searchVariable"]') as HTMLButtonElement;
-        const loadVariableButton = renderer.content.querySelector('button[name="loadVariable"]') as HTMLButtonElement;
         const variableStatusElement = renderer.content.querySelector('.slider_macros_variable_status') as HTMLDivElement;
 
-        // Set initial values for variable binding
-        if (variableSourceInput) variableSourceInput.value = slider.variableSource || '';
-        if (variableScopeSelect) variableScopeSelect.value = slider.variableScope || 'local';
-        if (syncToVariableCheckbox) syncToVariableCheckbox.checked = slider.syncToVariable || false;
+        // Set initial values for variable sync
+        if (syncVariableInput) syncVariableInput.value = slider.syncVariable || '';
+        if (syncScopeSelect) syncScopeSelect.value = slider.syncScope || 'local';
 
         // Variable status update function
         const updateVariableStatus = () => {
             if (!variableStatusElement) return;
-            const varName = variableSourceInput?.value.trim() || '';
-            const scope = variableScopeSelect?.value as 'local' | 'global' || 'local';
+            const varName = syncVariableInput?.value.trim() || '';
+            const scope = syncScopeSelect?.value as 'local' | 'global' || 'local';
 
             if (!varName) {
                 variableStatusElement.textContent = '';
@@ -1492,75 +1450,32 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             if (hasVariable(varName, scope)) {
                 const currentValue = getVariableValue(varName, scope);
                 const displayValue = String(currentValue).length > 30 ? String(currentValue).substring(0, 30) + '...' : String(currentValue);
-                variableStatusElement.textContent = `Variable found (current: ${displayValue})`;
+                variableStatusElement.textContent = `Variable exists (current: ${displayValue})`;
                 variableStatusElement.className = 'slider_macros_variable_status found';
             } else {
-                variableStatusElement.textContent = 'Variable not found';
-                variableStatusElement.className = 'slider_macros_variable_status not-found';
+                variableStatusElement.textContent = 'Variable will be created on first slider change';
+                variableStatusElement.className = 'slider_macros_variable_status available';
             }
         };
 
         // Initial variable status check
         updateVariableStatus();
 
-        // Variable source input handler
-        if (variableSourceInput) {
-            variableSourceInput.addEventListener('input', () => {
-                slider.variableSource = variableSourceInput.value;
+        // Sync variable input handler
+        if (syncVariableInput) {
+            syncVariableInput.addEventListener('input', () => {
+                slider.syncVariable = syncVariableInput.value;
                 updateVariableStatus();
                 debouncedSaveSettings();
             });
         }
 
-        // Variable scope select handler
-        if (variableScopeSelect) {
-            variableScopeSelect.addEventListener('change', () => {
-                slider.variableScope = variableScopeSelect.value as 'local' | 'global';
+        // Sync scope select handler
+        if (syncScopeSelect) {
+            syncScopeSelect.addEventListener('change', () => {
+                slider.syncScope = syncScopeSelect.value as 'local' | 'global';
                 updateVariableStatus();
                 debouncedSaveSettings();
-            });
-        }
-
-        // Sync to variable checkbox handler
-        if (syncToVariableCheckbox) {
-            syncToVariableCheckbox.addEventListener('change', () => {
-                slider.syncToVariable = syncToVariableCheckbox.checked;
-                debouncedSaveSettings();
-            });
-        }
-
-        // Load variable button - loads current value from variable into slider
-        if (loadVariableButton) {
-            loadVariableButton.addEventListener('click', () => {
-                const varName = variableSourceInput?.value.trim() || '';
-                const scope = variableScopeSelect?.value as 'local' | 'global' || 'local';
-
-                if (!varName) {
-                    Popup.show.confirm('No Variable', 'Please enter a variable name first.');
-                    return;
-                }
-
-                const value = getVariableValue(varName, scope);
-                if (value !== undefined) {
-                    // Convert value based on slider type
-                    if (slider.type === 'Numeric') {
-                        slider.value = Number(value) || 0;
-                    } else if (slider.type === 'Boolean') {
-                        slider.value = value === true || value === 'true' || value === 1 ? 1 : 0;
-                    } else if (slider.type === 'Checkbox') {
-                        slider.value = value === true || value === 'true' || value === slider.checkboxTrueValue;
-                    } else if (slider.type === 'Color') {
-                        slider.value = String(value).startsWith('#') ? String(value) : '#ffffff';
-                        if (defaultColorInput) defaultColorInput.value = slider.value as string;
-                    } else {
-                        slider.value = String(value);
-                    }
-                    renderCompletionSliders(settings);
-                    saveSettingsDebounced();
-                    updateVariableStatus();
-                } else {
-                    Popup.show.confirm('Variable Not Found', `Variable "${varName}" not found in ${scope} scope.`);
-                }
             });
         }
 
@@ -1569,10 +1484,10 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             searchVariableButton.addEventListener('click', async () => {
                 const selectedItem = await showMacroSearchPopup(true); // true = include variables
                 if (selectedItem && selectedItem.isVariable) {
-                    if (variableSourceInput) variableSourceInput.value = selectedItem.name;
-                    if (variableScopeSelect) variableScopeSelect.value = selectedItem.variableScope || 'local';
-                    slider.variableSource = selectedItem.name;
-                    slider.variableScope = selectedItem.variableScope as 'local' | 'global' || 'local';
+                    if (syncVariableInput) syncVariableInput.value = selectedItem.name;
+                    if (syncScopeSelect) syncScopeSelect.value = selectedItem.variableScope || 'local';
+                    slider.syncVariable = selectedItem.name;
+                    slider.syncScope = selectedItem.variableScope as 'local' | 'global' || 'local';
                     updateVariableStatus();
                     saveSettingsDebounced();
                 } else if (selectedItem) {
