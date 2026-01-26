@@ -411,6 +411,8 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const cardNameDisplay = renderer.content.querySelector('.slider_macros_card_name') as HTMLSpanElement;
         const cardMacroDisplay = renderer.content.querySelector('.slider_macros_card_macro') as HTMLSpanElement;
         const cardTypeBadge = renderer.content.querySelector('.slider_macros_card_type_badge') as HTMLSpanElement;
+        const cardGroupBadge = renderer.content.querySelector('.slider_macros_card_group_badge') as HTMLSpanElement;
+        const cardGroupName = renderer.content.querySelector('.slider_macros_card_group_name') as HTMLSpanElement;
 
         const nameInput = renderer.content.querySelector('input[name="name"]') as HTMLInputElement;
         const propertyInput = renderer.content.querySelector('input[name="property"]') as HTMLInputElement;
@@ -479,6 +481,21 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         cardNameDisplay.textContent = slider.name || 'New Slider';
         cardMacroDisplay.textContent = slider.property || '';
         cardTypeBadge.textContent = slider.type || 'Numeric';
+
+        // Update group badge display
+        const updateGroupBadge = () => {
+            if (cardGroupBadge && cardGroupName) {
+                const assignedGroup = activeCollection.groups.find(g => g.id === slider.groupId);
+                if (assignedGroup) {
+                    cardGroupBadge.dataset.visible = 'true';
+                    cardGroupName.textContent = assignedGroup.name;
+                } else {
+                    cardGroupBadge.dataset.visible = 'false';
+                    cardGroupName.textContent = '';
+                }
+            }
+        };
+        updateGroupBadge();
 
         // Update card visual state based on enabled
         if (!slider.enabled) {
@@ -656,6 +673,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         if (groupIdSelect) {
             groupIdSelect.addEventListener('change', () => {
                 slider.groupId = groupIdSelect.value || null;
+                updateGroupBadge();
                 saveSettingsDebounced();
                 renderCompletionSliders(settings);
             });

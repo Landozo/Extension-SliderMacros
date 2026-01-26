@@ -182,6 +182,35 @@
     white-space: nowrap;
 }
 
+/* Group Badge on Slider Cards */
+.slider_macros_card_group_badge {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7em;
+    color: var(--SmartThemeEmColor, #7b9fcf);
+    background: rgba(100, 150, 220, 0.15);
+    padding: 3px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    border: 1px solid rgba(100, 150, 220, 0.3);
+}
+
+.slider_macros_card_group_badge[data-visible="true"] {
+    display: flex;
+}
+
+.slider_macros_card_group_badge i {
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+.slider_macros_card_group_name {
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* Header Controls */
 .slider_macros_card_controls {
     display: flex;
