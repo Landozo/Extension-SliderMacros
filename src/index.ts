@@ -665,13 +665,13 @@ function setVariableFromTemplate(varName: string, template: string, scope: 'loca
 }
 
 /**
- * Syncs a slider's value to its bound variable if syncVariable is set.
+ * Syncs a slider's value to its bound variable if sync is enabled and configured.
  * Only syncs to EXISTING variables - will not create new ones.
  * @param slider - The slider model to sync
- * @returns True if sync was successful, false if variable doesn't exist
+ * @returns True if sync was successful, false if disabled or variable doesn't exist
  */
 function syncSliderToVariable(slider: SliderModel): boolean {
-    if (!slider.syncVariable) {
+    if (!slider.syncEnabled || !slider.syncVariable) {
         return false;
     }
 
@@ -722,6 +722,7 @@ interface SliderModel {
     groupId: string | null;
     order: number;
     // Variable sync fields
+    syncEnabled: boolean;
     syncVariable: string;
     syncScope: 'local' | 'global';
 }
@@ -829,14 +830,16 @@ export function getSettings(): ExtensionSettings {
                 maxSliderOrder = Math.max(maxSliderOrder, slider.order);
             }
             // Migration: Add variable sync fields
-            if ((slider as any).syncVariable === undefined) {
+            if ((slider as any).syncEnabled === undefined) {
                 // Migrate from old field names if they exist
-                slider.syncVariable = (slider as any).variableSource || '';
-                slider.syncScope = (slider as any).variableScope || 'local';
-                // If old syncToVariable was false, clear the syncVariable
-                if ((slider as any).syncToVariable === false) {
-                    slider.syncVariable = '';
-                }
+                const oldSyncToVariable = (slider as any).syncToVariable;
+                const oldVariableSource = (slider as any).variableSource;
+                
+                // Enable sync if old syncToVariable was true OR if there was a variableSource set
+                slider.syncEnabled = oldSyncToVariable === true || (oldVariableSource && oldVariableSource.trim() !== '');
+                slider.syncVariable = (slider as any).syncVariable || oldVariableSource || '';
+                slider.syncScope = (slider as any).syncScope || (slider as any).variableScope || 'local';
+                
                 // Clean up old fields
                 delete (slider as any).variableSource;
                 delete (slider as any).variableScope;
@@ -1063,6 +1066,7 @@ function createSlider(): void {
         checkboxFalseValue: 'false',
         groupId: null,
         order: getNextOrder(activeCollection),
+        syncEnabled: false,
         syncVariable: '',
         syncScope: 'local',
     });
@@ -1463,14 +1467,34 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         }
 
         // Variable sync elements
+        const syncEnabledCheckbox = renderer.content.querySelector('input[name="syncEnabled"]') as HTMLInputElement;
+        const variableConfigSection = renderer.content.querySelector('.slider_macros_variable_config') as HTMLDivElement;
         const syncVariableInput = renderer.content.querySelector('input[name="syncVariable"]') as HTMLInputElement;
         const syncScopeSelect = renderer.content.querySelector('select[name="syncScope"]') as HTMLSelectElement;
         const searchVariableButton = renderer.content.querySelector('button[name="searchVariable"]') as HTMLButtonElement;
         const variableStatusElement = renderer.content.querySelector('.slider_macros_variable_status') as HTMLDivElement;
 
         // Set initial values for variable sync
+        if (syncEnabledCheckbox) syncEnabledCheckbox.checked = slider.syncEnabled || false;
         if (syncVariableInput) syncVariableInput.value = slider.syncVariable || '';
         if (syncScopeSelect) syncScopeSelect.value = slider.syncScope || 'local';
+
+        // Show/hide variable config based on syncEnabled
+        const updateVariableConfigVisibility = () => {
+            if (variableConfigSection) {
+                variableConfigSection.style.display = slider.syncEnabled ? 'block' : 'none';
+            }
+        };
+        updateVariableConfigVisibility();
+
+        // Sync enabled checkbox handler
+        if (syncEnabledCheckbox) {
+            syncEnabledCheckbox.addEventListener('change', () => {
+                slider.syncEnabled = syncEnabledCheckbox.checked;
+                updateVariableConfigVisibility();
+                debouncedSaveSettings();
+            });
+        }
 
         // Variable status update function
         const updateVariableStatus = () => {
