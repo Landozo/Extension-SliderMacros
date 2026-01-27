@@ -370,10 +370,13 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    width: 100%;
+    min-width: 0;
 }
 
 .slider_macros_variable_scope {
     width: 90px;
+    min-width: 90px;
     flex-shrink: 0;
 }
 
@@ -381,10 +384,13 @@
     display: flex;
     align-items: center;
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .slider_macros_variable_input input {
-    flex: 1;
+    width: 100%;
+    min-width: 0;
     font-family: monospace;
 }
 
@@ -437,6 +443,9 @@
     background: rgba(0,0,0,0.2);
     border-radius: 6px;
     border: 1px solid var(--SmartThemeBorderColor, #333);
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 /* Duplicate Button */
