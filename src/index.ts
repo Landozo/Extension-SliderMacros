@@ -1599,14 +1599,15 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                     slider.syncScope = selectedItem.variableScope as 'local' | 'global' || 'local';
                     updateVariableStatus();
                     saveSettingsDebounced();
-                } else if (selectedItem) {
-                    // Selected a macro, fill in property field instead
-                    propertyInput.value = selectedItem.name;
-                    slider.property = selectedItem.name;
-                    cardMacroDisplay.textContent = selectedItem.name;
-                    updateMacroStatus();
-                    saveSettingsDebounced();
-                }
+                } //commenting this out because a macro can't be synced, and it's not clear why this is here
+                // else if (selectedItem) {
+                //     // Selected a macro, fill in property field instead
+                //     propertyInput.value = selectedItem.name;
+                //     slider.property = selectedItem.name;
+                //     cardMacroDisplay.textContent = selectedItem.name;
+                //     updateMacroStatus();
+                //     saveSettingsDebounced();
+                // }
             });
         }
 
