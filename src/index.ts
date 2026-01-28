@@ -15,6 +15,47 @@ const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings,
 const MODULE_NAME = 'sliderMacros';
 const DEBOUNCE_DELAY = 300;
 
+// Cache of protected (core) macro names - populated once at startup before any slider registration
+// This prevents the issue where our slider overrides a core macro and then isProtected becomes false
+let protectedMacroNamesCache: Set<string> | null = null;
+
+/**
+ * Initializes the cache of protected macro names.
+ * Should be called once at startup before any slider macros are registered.
+ */
+function initProtectedMacrosCache(): void {
+    if (protectedMacroNamesCache !== null) return; // Already initialized
+    
+    protectedMacroNamesCache = new Set<string>();
+    
+    // Get macros from the v2 registry
+    if (macros?.registry?.getAllMacros) {
+        try {
+            const allMacros = macros.registry.getAllMacros({ excludeHiddenAliases: true });
+            for (const macro of allMacros) {
+                // Protected = core macro (not from an extension)
+                if (!macro.source?.isExtension) {
+                    protectedMacroNamesCache.add(macro.name);
+                }
+            }
+            console.debug(`[SliderMacros] Cached ${protectedMacroNamesCache.size} protected macro names`);
+        } catch (e) {
+            console.warn('[SliderMacros] Failed to cache protected macros:', e);
+        }
+    }
+}
+
+/**
+ * Checks if a macro name is a protected core macro.
+ * Uses the cached list to avoid issues with our slider overriding the macro.
+ */
+function isProtectedMacro(macroName: string): boolean {
+    if (protectedMacroNamesCache === null) {
+        initProtectedMacrosCache();
+    }
+    return protectedMacroNamesCache?.has(macroName) || false;
+}
+
 // Local debounce utility for text inputs
 function debounce<T extends (...args: unknown[]) => void>(fn: T, delay: number): T {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -125,6 +166,7 @@ function hasMacro(macroName: string): boolean {
 /**
  * Lists all known macros from both systems with rich metadata.
  * Normalizes data structure for consistent filtering and identifies protected core macros.
+ * Uses cached protected status to avoid issues with slider overrides.
  * @returns Array of macro info objects
  */
 function getAllKnownMacros(): MacroInfo[] {
@@ -138,13 +180,13 @@ function getAllKnownMacros(): MacroInfo[] {
             for (const macro of newMacros) {
                 // Calculate total minimum required arguments
                 const minArgs = (macro.minArgs || 0) + (macro.list?.min || 0);
-                // Protected check: Core macros are protected
-                const isProtected = !macro.source?.isExtension;
+                // Use cached protected status to handle slider overrides correctly
+                const isProtected = isProtectedMacro(macro.name);
 
                 macroMap.set(macro.name, {
                     name: macro.name,
                     description: macro.description || '',
-                    source: macro.source?.isExtension ? 'extension' : 'core',
+                    source: isProtected ? 'core' : (macro.source?.isExtension ? 'extension' : 'core'),
                     sourceName: macro.source?.name || 'unknown',
                     category: macro.category || 'unknown',
                     minArgs: minArgs,
@@ -1412,23 +1454,19 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                 return;
             }
 
-            // Find macro info to check if protected
-            const allMacros = getAllKnownMacros();
-            const macroInfo = allMacros.find(m => m.name === macroName);
+            // Use cached protected status to avoid issues with our slider overriding core macros
+            const isProtected = isProtectedMacro(macroName);
+            
+            // Check if macro exists (either in registry or resolves to a value)
+            const macroExists = hasMacro(macroName);
 
-            if (macroInfo) {
+            if (isProtected) {
+                // Always show as protected if it was originally a core macro
                 const currentValue = getMacroValue(macroName);
                 const displayValue = currentValue.length > 30 ? currentValue.substring(0, 30) + '...' : currentValue;
-
-                if (macroInfo.isProtected) {
-                    macroStatusElement.textContent = `⚠ Overrides PROTECTED core macro (current: ${displayValue})`;
-                    macroStatusElement.className = 'slider_macros_macro_status protected';
-                } else {
-                    macroStatusElement.textContent = `Overrides existing macro (current: ${displayValue})`;
-                    macroStatusElement.className = 'slider_macros_macro_status exists';
-                }
-            } else if (hasMacro(macroName)) {
-                // Macro exists but not found in our list (edge case)
+                macroStatusElement.textContent = `⚠ Overrides PROTECTED core macro (current: ${displayValue})`;
+                macroStatusElement.className = 'slider_macros_macro_status protected';
+            } else if (macroExists) {
                 const currentValue = getMacroValue(macroName);
                 const displayValue = currentValue.length > 30 ? currentValue.substring(0, 30) + '...' : currentValue;
                 macroStatusElement.textContent = `Overrides existing macro (current: ${displayValue})`;
@@ -2585,6 +2623,9 @@ const observer = new MutationObserver(debounce(() => {
 }, 500));
 
 (async function init() {
+    // Initialize protected macros cache FIRST, before any slider registration
+    initProtectedMacrosCache();
+    
     const settings = getSettings();
     addSettingsControls(settings);
     renderCompletionSliders(settings);
