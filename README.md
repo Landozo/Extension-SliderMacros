@@ -54,31 +54,40 @@ The purpose of this extension is to give the ability to rapidly change the value
 	- Color lets you use a color picker to select a hue value. Useful for a macro to set the text value of a character!
 	- Checkbox lets you make a checkbox and assign the checked or unchecked value to true or false, basically an alternative to the Boolean slider.
 4. Finally you can create a named group of sliders and assign each slider to a group with the group dropdown.
+<img width="531" height="886" alt="image" src="https://github.com/user-attachments/assets/0eedee3e-90f2-4dab-b2cc-58cacf271218" />
+
+In the above example you can see I made a "Test Group" and put two sliders in it using the Group dropdown!
 
 ### How to use the sliders
 
 In the chat completions panel on the left of sillytavern, below the sampler and chat completions settings, but above the prompt manager, you'll find a collapsible dropdown that expands to show your selected sliders. It also has a dropdown for choosing a collection of sliders (more on that later).
 
---Insert Image showing the sliders dropdown in the chat completions panel--
+<img width="333" height="585" alt="image" src="https://github.com/user-attachments/assets/34288696-d2e2-4695-92d1-f8e02e648e0a" />
 
 You can freely move these sliders around to update your macros in real time.
+
+<img width="312" height="234" alt="image" src="https://github.com/user-attachments/assets/26450ea6-b891-4cdb-b936-2f6106b0c66a" />
 
 As for calling the variable macros, simply insert them like so: ```{{testVarA}}``` into your system prompt or lorebook for values that will be "locked in" to the slider set value when you click "send message/generate" in the chat window.
 
 You can also just put them into the chat window itself and they will replace with the value when you hit enter.
 
---Insert Image showing a {{macro}} in a system prompt toggle--
+<img width="738" height="394" alt="image" src="https://github.com/user-attachments/assets/6b3f7cf1-9a23-4748-b113-75764672ef26" />
+
+<img width="467" height="347" alt="image" src="https://github.com/user-attachments/assets/bab2989b-fe91-4b16-ba1f-da7919eb1ae2" />
+
+Above you can see an example where I made a prompt with the {{numVarA}} macro, set it to .56 in the toggle, and sent it as a system prompt, then the llm outputted it as directed.
 
 > [!NOTE]
-> Keep in mind that {{macros}} are Sillytavern specific, they are replaced with the values set after being sent to the LLM. To the LLM, a {{variableA}} set to 10, will just look like the number 10. This means your macros will be updated for future prompt sends, but not for past ones!
+> Keep in mind that {{macros}} are Sillytavern specific, they are replaced with the values set after being sent to the LLM. To the LLM, a {{variableA}} set to 10, will just look like the number 10. This means your macros will be updated for future prompt sends, but not for past ones! You can see this in the terminal output below. Only the actual value is sent as plaintext to the llm!
 
---Insert Image showing how macros resolve to plain text before going to the llm--
+<img width="692" height="460" alt="image" src="https://github.com/user-attachments/assets/26862954-58e5-45b7-9295-f621381fbbe9" />
 
 ### The Slider Collection System
 
-Above the create slider button in the extension, you'll see a bar that includes a dropdown and various buttons to the right. This is the slider collections system, think of this like presets but for your sliders.
+Above the create slider button in the extension, you'll see a bar that includes a dropdown and various buttons to the right. This is the slider collections system, think of this like presets but for your sliders. It lets you hotswap between sliders!
 
---Insert Image showing the collections bar--
+<img width="542" height="91" alt="image" src="https://github.com/user-attachments/assets/9d0e6146-1b39-4e84-accc-06606161b8cd" />
 
 You have the following options here:
 
@@ -87,7 +96,7 @@ You have the following options here:
 - The import (arrow in) and export (arrow out) buttons allow you to import and export slider collections.
 - Lastly, the trash can icon lets you delete a collection (no way to undo this, be careful!).
 
-### The Ever Mysterious Search Existing Macros Button
+### The Ever Mysterious Search Existing Macros Button (For Power Users only!)
 
 This button lets Power Users override existing macro values. It has no safeguards, so be careful! We are not responsible for you turning {{Trim}} to be zalgo text and then causing your entire preset to temporarily be spooky!
 
