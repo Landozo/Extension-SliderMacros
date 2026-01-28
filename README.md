@@ -31,6 +31,8 @@ This works with Vanilla themed sillytavern, Moonlit Echoes themed sillytavern, a
 
 The purpose of this extension is to give the ability to rapidly change the value of setting user {{macros}} in Sillytavern's Macro Engine. Macros can be a numeric value, a boolean value (true or false), a hex value, or a string value; this slider extension allows for selecting and controlling all four in various ways.
 
+## Usage Instructions
+
 ### How to set up sliders
 
 1. In the extension settings menu, you will find a Slider Macros menu, open it.
@@ -63,7 +65,7 @@ The purpose of this extension is to give the ability to rapidly change the value
 
 In the above example you can see I made a "Test Group" and put two sliders in it using the Group dropdown!
 
-### How to use the sliders
+### How to use your sliders
 
 In the chat completions panel on the left of sillytavern, below the sampler and chat completions settings, but above the prompt manager, you'll find a collapsible dropdown that expands to show your selected sliders. It also has a dropdown for choosing a collection of sliders (more on that later).
 
@@ -123,7 +125,7 @@ Simply change the synced variable name or untick the box and reload sillytavern 
 > [!NOTE]
 > The search button to the right of the variable name is current non-functional, but will be implemented in the future!
 
-### The Ever Mysterious Search Existing Macros Button (For Power Users only!)
+### The Sync to Macros System (For Power Users only!)
 
 If you set the macroname to an existing sillytavern macro, you can overwrite/hijack it's output using the slider! There is even a search button next to macro name to help you find existing macros. It has no safeguards, so be careful! We are not responsible for you turning {{Trim}} to be zalgo text and then causing your entire preset to temporarily be spooky! Basically the search box allows you to search for a {{macroName}} and then set it to the value of the slider.
 
