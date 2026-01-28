@@ -109,11 +109,41 @@ The below features allow you to hook into and overwrite any local or global vari
 
 Near the bottom of the configuring Sliders page is a box that allows you to sync the value of the slider to overwrite any variable of your choice. You can use the dropdown to select local or global variables and the status message underneath will let you know if there is a variable matching the name. You'll need the variable to already exist via {{setvar::variableName::value}}. Do a {{getvar::variablename}} first to initialize the variable in memory. Then you can use the slider to overwrite the value of the variable and see it reflected in further getvar calls.
 
-The search button to the right of the variable name is current non-functional, but will be implemented in the future!
+<img width="453" height="143" alt="image" src="https://github.com/user-attachments/assets/9cb3a66d-f631-464f-97ff-4a250a1aa3ec" />
+
+You can see me initialize and call a variable here so it'll be in memory.
+
+
+<img width="700" height="176" alt="image" src="https://github.com/user-attachments/assets/b315cb32-d13f-4107-b78a-32d84a3800b8" />
+
+Now if I enter this variable into the box it is synced and if I change the associated slider value it will overwrite the variable!
+
+Simply change the synced variable name or untick the box and reload sillytavern or setvar to whatever you want to undo this.
+
+> [!NOTE]
+> The search button to the right of the variable name is current non-functional, but will be implemented in the future!
 
 ### The Ever Mysterious Search Existing Macros Button (For Power Users only!)
 
-If you set the macroname to an existing macro, you can overwrite/hijack it using the slider! There is even a search button next to macro name to help you find existing macros. It has no safeguards, so be careful! We are not responsible for you turning {{Trim}} to be zalgo text and then causing your entire preset to temporarily be spooky! Basically the search box allows you to search for a {{macroName}} and then set it to the value of the slider.
+If you set the macroname to an existing sillytavern macro, you can overwrite/hijack it's output using the slider! There is even a search button next to macro name to help you find existing macros. It has no safeguards, so be careful! We are not responsible for you turning {{Trim}} to be zalgo text and then causing your entire preset to temporarily be spooky! Basically the search box allows you to search for a {{macroName}} and then set it to the value of the slider.
+
+<img width="467" height="177" alt="image" src="https://github.com/user-attachments/assets/8e2bf89b-2147-499c-906d-78f0fcc37a28" />
+
+Above the search bar can be seen to the right of the macro button.
+
+<img width="481" height="498" alt="image" src="https://github.com/user-attachments/assets/6ba72ca7-aae4-4240-b039-ce4ff0e46779" />
+
+In the search I can set it to {{maxprompt}} which normally retrieves the max context.
+
+<img width="459" height="113" alt="image" src="https://github.com/user-attachments/assets/ab965b60-c3ff-4202-acd4-d0ea08422014" />
+
+You can see selecting a macro from the search results populates the macro name with said macro.
+
+<img width="367" height="160" alt="image" src="https://github.com/user-attachments/assets/15437304-d2fb-4d21-8984-57a08d1f28f6" />
+
+Now I move the slider to 42, and when I call max prompt, you can see it shows the slider value.
+
+<img width="303" height="143" alt="image" src="https://github.com/user-attachments/assets/963c0354-39ba-49e6-b7c6-a17655af9718" />
 
 > [!NOTE]
 > If you ever get in a sticky situation, just change the macro to a different non-occupied value and reload the SillyTavern page to reset the macro to the original SillyTavern value!
