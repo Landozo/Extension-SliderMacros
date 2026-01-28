@@ -8,8 +8,8 @@ This works with Vanilla themed sillytavern, Moonlit Echoes themed sillytavern, a
 
 ## Features
 
-- Customizable Sliders (Numeric, Multiselect, Boolean), checkboxes, hue pickers, and dropdown menus that can be bound to {{macros}} values using a wide variety of settings.
-- The ability to control said sliders from a dedicated collapsible menu in the chat completion panel to activately control macro values in real time.
+- Customizable Sliders (Numeric, Multiselect, Boolean), checkboxes, hue pickers, and dropdown menus that can used to output values to user settable {{macros}}.
+- The ability to control said sliders and their outputs from a dedicated collapsible menu in the chat completion panel in real time.
 - Grouping system to group sliders into groups for easier navigation!
 - Collection/Preset system to save slider macros, allow hotswapping between collections, bind them to a chat completion preset, and allow importing and exporting of slider collections!
 - Macros 2.0 functionality out of the box! Also compatible with nemo preset extension and moonlit echoes!
