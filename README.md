@@ -11,16 +11,16 @@ This works with Vanilla themed sillytavern, Moonlit Echoes themed sillytavern, a
 1. In Sillytavern, in the extensions menu (<img width="30" height="29" alt="image" src="https://github.com/user-attachments/assets/4645c5f4-81ea-4875-a8dd-0b1da463bb95" />
 ), click the install extension button on the upper right.
 
-<img width="427" height="114" alt="image" src="https://github.com/user-attachments/assets/b8e90243-6c10-468c-840d-de99dbb782af" />
+	<img width="427" height="114" alt="image" src="https://github.com/user-attachments/assets/b8e90243-6c10-468c-840d-de99dbb782af" />
 
 2. In the new dialog, insert the url of this page and hit install for me or install for all users: 
 ```https://github.com/Landozo/Extension-SliderMacros```
 
-<img width="516" height="403" alt="image" src="https://github.com/user-attachments/assets/3d833ec2-a920-432a-847b-f452c4d47c9f" />
+	<img width="516" height="403" alt="image" src="https://github.com/user-attachments/assets/3d833ec2-a920-432a-847b-f452c4d47c9f" />
 
 3. Enable the "Experimental Macro Engine" in the user settings (<img width="31" height="28" alt="image" src="https://github.com/user-attachments/assets/0ff44b0b-77d1-470e-8da7-d9e047f5d51d" />) menu.
 
-<img width="413" height="731" alt="image" src="https://github.com/user-attachments/assets/e020ce7b-f42e-4e78-90e9-8d7c7ad2628f" />
+	<img width="413" height="731" alt="image" src="https://github.com/user-attachments/assets/e020ce7b-f42e-4e78-90e9-8d7c7ad2628f" />
 
 > [!WARNING]
 > This extension will not work with the older macro engine! You need to use the experimental one, which requires Sillytavern 1.15 or later!
@@ -34,18 +34,22 @@ The purpose of this extension is to give the ability to rapidly change the value
 ### How to set up sliders
 
 1. In the extension settings menu, you will find a Slider Macros menu, open it.
-<img width="618" height="320" alt="image" src="https://github.com/user-attachments/assets/d0ded196-4ac8-4ffe-9294-1fa8a84421f1" />
+	
+	<img width="618" height="320" alt="image" src="https://github.com/user-attachments/assets/d0ded196-4ac8-4ffe-9294-1fa8a84421f1" />
 
 2. Click Create Slider to create a new slider.
-<img width="504" height="153" alt="image" src="https://github.com/user-attachments/assets/e0ce07cc-5f95-4867-b8c4-c6d4c786e2a6" />
+	
+	<img width="504" height="153" alt="image" src="https://github.com/user-attachments/assets/e0ce07cc-5f95-4867-b8c4-c6d4c786e2a6" />
 
-3. A new slider item will appear, click it to expand it. After doing so you have several options:
-<img width="495" height="513" alt="image" src="https://github.com/user-attachments/assets/9ee4167a-7ac8-4cba-a97b-c61f22e26c29" />
+4. A new slider item will appear, click it to expand it. After doing so you have several options:
+	
+	<img width="495" height="513" alt="image" src="https://github.com/user-attachments/assets/9ee4167a-7ac8-4cba-a97b-c61f22e26c29" />
 
 - Name lets you give the slider a name, which will appear above it in the chat completions panel (more on that later)
 - Macro Variable lets you set what {{variable}} the slider will map to.
 - Type lets you choose between numeric, boolean, multiselect, dropdown, checkbox, and color.
-<img width="472" height="218" alt="image" src="https://github.com/user-attachments/assets/a43ac930-2be3-4a2c-a841-a4fad838cf75" />
+  
+	<img width="472" height="218" alt="image" src="https://github.com/user-attachments/assets/a43ac930-2be3-4a2c-a841-a4fad838cf75" />
 - There are 5 types:
 	- Numeric lets you choose a minimum and maximum numeric value and the step value between each "notch" of the slider (So, say 1 to 100, with a value of 5 between each tick).
 	- Boolean lets you choose between a dual value slider of true or false. You can choose which is the default value, true or false.
@@ -54,18 +58,18 @@ The purpose of this extension is to give the ability to rapidly change the value
 	- Color lets you use a color picker to select a hue value. Useful for a macro to set the text value of a character!
 	- Checkbox lets you make a checkbox and assign the checked or unchecked value to true or false, basically an alternative to the Boolean slider.
 4. Finally you can create a named group of sliders and assign each slider to a group with the group dropdown.
-<img width="531" height="886" alt="image" src="https://github.com/user-attachments/assets/0eedee3e-90f2-4dab-b2cc-58cacf271218" />
+	
+	<img width="531" height="886" alt="image" src="https://github.com/user-attachments/assets/0eedee3e-90f2-4dab-b2cc-58cacf271218" />
 
 In the above example you can see I made a "Test Group" and put two sliders in it using the Group dropdown!
 
 ### How to use the sliders
 
 In the chat completions panel on the left of sillytavern, below the sampler and chat completions settings, but above the prompt manager, you'll find a collapsible dropdown that expands to show your selected sliders. It also has a dropdown for choosing a collection of sliders (more on that later).
-
 <img width="333" height="585" alt="image" src="https://github.com/user-attachments/assets/34288696-d2e2-4695-92d1-f8e02e648e0a" />
 
 You can freely move these sliders around to update your macros in real time.
-
+	
 <img width="312" height="234" alt="image" src="https://github.com/user-attachments/assets/26450ea6-b891-4cdb-b936-2f6106b0c66a" />
 
 As for calling the variable macros, simply insert them like so: ```{{testVarA}}``` into your system prompt or lorebook for values that will be "locked in" to the slider set value when you click "send message/generate" in the chat window.
