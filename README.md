@@ -101,12 +101,22 @@ You have the following options here:
 - The import (arrow in) and export (arrow out) buttons allow you to import and export slider collections.
 - Lastly, the trash can icon lets you delete a collection (no way to undo this, be careful!).
 
+## Power User Features
+
+The below features allow you to hook into and overwrite any local or global variable (getvar retrieved variables), or even any Sillytavern Macro. Use these features with caution! They are easily reversible by just changing the slider macro to another value and refreshing sillytavern, but I still recommend you don't use them unless you know what you're doing!
+
+### The Sync to Variables System
+
+Near the bottom of the configuring Sliders page is a box that allows you to sync the value of the slider to overwrite any variable of your choice. You can use the dropdown to select local or global variables and the status message underneath will let you know if there is a variable matching the name. You'll need the variable to already exist via {{setvar::variableName::value}}. Do a {{getvar::variablename}} first to initialize the variable in memory. Then you can use the slider to overwrite the value of the variable and see it reflected in further getvar calls.
+
+The search button to the right of the variable name is current non-functional, but will be implemented in the future!
+
 ### The Ever Mysterious Search Existing Macros Button (For Power Users only!)
 
-This button lets Power Users override existing macro values. It has no safeguards, so be careful! We are not responsible for you turning {{Trim}} to be zalgo text and then causing your entire preset to temporarily be spooky!
+If you set the macroname to an existing macro, you can overwrite/hijack it using the slider! There is even a search button next to macro name to help you find existing macros. It has no safeguards, so be careful! We are not responsible for you turning {{Trim}} to be zalgo text and then causing your entire preset to temporarily be spooky! Basically the search box allows you to search for a {{macroName}} and then set it to the value of the slider.
 
 > [!NOTE]
-> If you ever get in a sticky situation, just change the macro to a different non-occupied value and reload to reset the macro to the original sillytavern value!
+> If you ever get in a sticky situation, just change the macro to a different non-occupied value and reload the SillyTavern page to reset the macro to the original SillyTavern value!
 
 ### Troubleshooting
 

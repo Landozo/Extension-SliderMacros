@@ -396,7 +396,7 @@ async function showMacroSearchPopup(includeVariables = false): Promise<MacroInfo
         const initialHtml = `
             <div class="slider_macros_search_container">
                 <div class="slider_macros_search_description">
-                    <p class="pulse_opacity">This will let you search for existing macros and remap them to slider values, even core Sillytavern Macros. This is not recommended for beginners, as it can cause unexpected behavior.<br>This can easily be undone by simply setting a different variable/macro name for the slider and refreshing sillytavern.</p>
+                    <p class="pulse_opacity">This will let you search for existing Macros or Variables and remap them to slider values, even core Sillytavern Macros. This is not recommended for beginners, as it can cause unexpected behavior.<br>This can easily be undone by simply setting a different variable/macro name for the slider and refreshing sillytavern.</p>
                 </div>
                 <div class="slider_macros_search_input_row">
                     <input type="text" class="text_pole slider_macros_search_input" placeholder="${placeholder}">
@@ -1599,7 +1599,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                     slider.syncScope = selectedItem.variableScope as 'local' | 'global' || 'local';
                     updateVariableStatus();
                     saveSettingsDebounced();
-                } //commenting this out because a macro can't be synced, and it's not clear why this is here
+                } //commenting this out because a macro can't be synced to the var search, so it's not clear why this is here
                 // else if (selectedItem) {
                 //     // Selected a macro, fill in property field instead
                 //     propertyInput.value = selectedItem.name;
