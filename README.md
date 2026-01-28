@@ -6,6 +6,15 @@ This is a Fork of the Sillytavern [CustomSliders Extension by Cohee1207](https:/
 
 This works with Vanilla themed sillytavern, Moonlit Echoes themed sillytavern, and Nemo's Nemo Preset Extension enabled sillytavern as of January 26, 2026!
 
+## Features
+
+- Customizable Sliders (Numeric, Multiselect, Boolean), checkboxes, hue pickers, and dropdown menus that can be bound to {{macros}} values using a wide variety of settings.
+- The ability to control said sliders from a dedicated collapsible menu in the chat completion panel to activately control macro values in real time.
+- Grouping system to group sliders into groups for easier navigation!
+- Collection/Preset system to save slider macros, allow hotswapping between collections, bind them to a chat completion preset, and allow importing and exporting of slider collections!
+- Macros 2.0 functionality out of the box! Also compatible with nemo preset extension and moonlit echoes!
+- The ability to sync the macro to any existing variable or SillyTavern macro and allow temporary control of either using the macro slider (easily undoable).
+
 ## How to install
 
 1. In Sillytavern, in the extensions menu (<img width="30" height="29" alt="image" src="https://github.com/user-attachments/assets/4645c5f4-81ea-4875-a8dd-0b1da463bb95" />
@@ -29,7 +38,7 @@ This works with Vanilla themed sillytavern, Moonlit Echoes themed sillytavern, a
 
 ## What does this do?
 
-The purpose of this extension is to give the ability to rapidly change the value of setting user {{macros}} in Sillytavern's Macro Engine. Macros can be a numeric value, a boolean value (true or false), a hex value, or a string value; this slider extension allows for selecting and controlling all four in various ways.
+The purpose of this extension is to give the ability to rapidly change the value of customizable user {{macros}} in Sillytavern's Macro Engine. Macros can be a numeric value, a boolean value (true or false), a hex value, or a string value; this slider extension allows for selecting and controlling all four in various ways.
 
 ## Usage Instructions
 
