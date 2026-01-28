@@ -19,7 +19,8 @@
             <button class="menu_button menu_button_icon slider_macros_btn_icon" name="up" type="button" title="Move Up">
                 <i class="fa-solid fa-chevron-up"></i>
             </button>
-            <button class="menu_button menu_button_icon slider_macros_btn_icon" name="down" type="button" title="Move Down">
+            <button class="menu_button menu_button_icon slider_macros_btn_icon" name="down" type="button"
+                title="Move Down">
                 <i class="fa-solid fa-chevron-down"></i>
             </button>
         </div>
@@ -30,7 +31,7 @@
                 <label class="slider_macros_label">Name</label>
                 <input class="text_pole" type="text" name="name" placeholder="e.g. Temperature">
             </div>
-            <div class="slider_macros_field">
+            <div class="slider_macros_field slider_macros_field_wide">
                 <label class="slider_macros_label">Macro Name</label>
                 <div class="slider_macros_macro_input_row">
                     <div class="slider_macros_macro_input">
@@ -38,7 +39,8 @@
                         <input class="text_pole" type="text" name="property" placeholder="myVar">
                         <span class="slider_macros_macro_suffix">}}</span>
                     </div>
-                    <button class="menu_button menu_button_icon slider_macros_btn_search_macro" name="searchMacro" type="button" title="Search existing macros to override">
+                    <button class="menu_button menu_button_icon slider_macros_btn_search_macro" name="searchMacro"
+                        type="button" title="Search existing macros to override">
                         <i class="fa-solid fa-search"></i>
                     </button>
                 </div>
@@ -80,12 +82,14 @@
                     <div class="slider_macros_variable_input">
                         <input class="text_pole" type="text" name="syncVariable" placeholder="variable name">
                     </div>
-                    <button class="menu_button menu_button_icon slider_macros_btn_search_variable" name="searchVariable" type="button" title="Search variables">
+                    <button class="menu_button menu_button_icon slider_macros_btn_search_variable" name="searchVariable"
+                        type="button" title="Search variables">
                         <i class="fa-solid fa-search"></i>
                     </button>
                 </div>
                 <div class="slider_macros_variable_status" name="variableStatus"></div>
-                <div class="slider_macros_sync_hint">Syncs slider value to an existing variable. Use {{getvar::name}} or {{getglobalvar::name}} to retrieve.</div>
+                <div class="slider_macros_sync_hint">Syncs slider value to an existing variable. Use {{getvar::name}} or
+                    {{getglobalvar::name}} to retrieve.</div>
             </div>
         </div>
         <!-- Numeric options -->
@@ -129,11 +133,13 @@
             </div>
             <div class="slider_macros_field_row">
                 <div class="slider_macros_field slider_macros_field_half">
-                    <label class="slider_macros_label">Option 3 <span class="slider_macros_optional">(optional)</span></label>
+                    <label class="slider_macros_label">Option 3 <span
+                            class="slider_macros_optional">(optional)</span></label>
                     <input class="text_pole" type="text" name="option3" placeholder="">
                 </div>
                 <div class="slider_macros_field slider_macros_field_half">
-                    <label class="slider_macros_label">Option 4 <span class="slider_macros_optional">(optional)</span></label>
+                    <label class="slider_macros_label">Option 4 <span
+                            class="slider_macros_optional">(optional)</span></label>
                     <input class="text_pole" type="text" name="option4" placeholder="">
                 </div>
             </div>
@@ -141,11 +147,13 @@
         <!-- Dropdown options -->
         <div class="dropdown-only slider_macros_type_section">
             <div class="slider_macros_field">
-                <label class="slider_macros_label">Dropdown Options <span class="slider_macros_optional">(key → macro value)</span></label>
+                <label class="slider_macros_label">Dropdown Options <span class="slider_macros_optional">(key → macro
+                        value)</span></label>
                 <div class="slider_macros_dropdown_options" data-name="dropdownOptions">
                     <!-- Dynamic rows added here -->
                 </div>
-                <button class="menu_button menu_button_icon slider_macros_btn_add_option" name="addDropdownOption" type="button">
+                <button class="menu_button menu_button_icon slider_macros_btn_add_option" name="addDropdownOption"
+                    type="button">
                     <i class="fa-solid fa-plus"></i>
                     <span>Add Option</span>
                 </button>
@@ -170,11 +178,13 @@
         <div class="checkbox-only slider_macros_type_section">
             <div class="slider_macros_field_row">
                 <div class="slider_macros_field slider_macros_field_half">
-                    <label class="slider_macros_label">True Value <span class="slider_macros_optional">(macro output when checked)</span></label>
+                    <label class="slider_macros_label">True Value <span class="slider_macros_optional">(macro output
+                            when checked)</span></label>
                     <input class="text_pole" type="text" name="checkboxTrueValue" placeholder="true">
                 </div>
                 <div class="slider_macros_field slider_macros_field_half">
-                    <label class="slider_macros_label">False Value <span class="slider_macros_optional">(macro output when unchecked)</span></label>
+                    <label class="slider_macros_label">False Value <span class="slider_macros_optional">(macro output
+                            when unchecked)</span></label>
                     <input class="text_pole" type="text" name="checkboxFalseValue" placeholder="false">
                 </div>
             </div>

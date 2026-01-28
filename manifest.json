@@ -6,7 +6,7 @@
     "js": "dist/index.js",
     "css": "",
     "author": "Landozo and Prolix",
-    "version": "0.1.5",
+    "version": "0.3.0",
     "homePage": "https://github.com/Landozo/Extension-SliderMacros",
     "auto_update": true
 }

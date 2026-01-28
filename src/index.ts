@@ -25,9 +25,9 @@ let protectedMacroNamesCache: Set<string> | null = null;
  */
 function initProtectedMacrosCache(): void {
     if (protectedMacroNamesCache !== null) return; // Already initialized
-    
+
     protectedMacroNamesCache = new Set<string>();
-    
+
     // Get macros from the v2 registry
     if (macros?.registry?.getAllMacros) {
         try {
@@ -391,10 +391,13 @@ async function showMacroSearchPopup(includeVariables = false): Promise<MacroInfo
         let selectedMacro: MacroInfo | null = null;
 
         // Build initial HTML
-        const title = includeVariables ? 'Search Macros & Variables' : 'Search Existing Macros';
+        const title = includeVariables ? 'Search Macros & Variables' : 'Search Existing Macros (Power Users Only!)';
         const placeholder = includeVariables ? 'Search macros and variables...' : 'Search macros by name or description...';
         const initialHtml = `
             <div class="slider_macros_search_container">
+                <div class="slider_macros_search_description">
+                    <p class="pulse_opacity">This will let you search for existing macros and remap them to slider values, even core Sillytavern Macros. This is not recommended for beginners, as it can cause unexpected behavior.<br>This can easily be undone by simply setting a different variable/macro name for the slider and refreshing sillytavern.</p>
+                </div>
                 <div class="slider_macros_search_input_row">
                     <input type="text" class="text_pole slider_macros_search_input" placeholder="${placeholder}">
                 </div>
@@ -876,12 +879,12 @@ export function getSettings(): ExtensionSettings {
                 // Migrate from old field names if they exist
                 const oldSyncToVariable = (slider as any).syncToVariable;
                 const oldVariableSource = (slider as any).variableSource;
-                
+
                 // Enable sync if old syncToVariable was true OR if there was a variableSource set
                 slider.syncEnabled = oldSyncToVariable === true || (oldVariableSource && oldVariableSource.trim() !== '');
                 slider.syncVariable = (slider as any).syncVariable || oldVariableSource || '';
                 slider.syncScope = (slider as any).syncScope || (slider as any).variableScope || 'local';
-                
+
                 // Clean up old fields
                 delete (slider as any).variableSource;
                 delete (slider as any).variableScope;
@@ -1456,7 +1459,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 
             // Use cached protected status to avoid issues with our slider overriding core macros
             const isProtected = isProtectedMacro(macroName);
-            
+
             // Check if macro exists (either in registry or resolves to a value)
             const macroExists = hasMacro(macroName);
 
@@ -2625,7 +2628,7 @@ const observer = new MutationObserver(debounce(() => {
 (async function init() {
     // Initialize protected macros cache FIRST, before any slider registration
     initProtectedMacrosCache();
-    
+
     const settings = getSettings();
     addSettingsControls(settings);
     renderCompletionSliders(settings);
