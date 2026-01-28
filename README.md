@@ -66,6 +66,7 @@ In the above example you can see I made a "Test Group" and put two sliders in it
 ### How to use the sliders
 
 In the chat completions panel on the left of sillytavern, below the sampler and chat completions settings, but above the prompt manager, you'll find a collapsible dropdown that expands to show your selected sliders. It also has a dropdown for choosing a collection of sliders (more on that later).
+
 <img width="333" height="585" alt="image" src="https://github.com/user-attachments/assets/34288696-d2e2-4695-92d1-f8e02e648e0a" />
 
 You can freely move these sliders around to update your macros in real time.
