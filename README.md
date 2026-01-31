@@ -124,15 +124,11 @@ Near the bottom of the configuring Sliders page is a box that allows you to sync
 
 You can see me initialize and call a variable here so it'll be in memory.
 
-
 <img width="700" height="176" alt="image" src="https://github.com/user-attachments/assets/b315cb32-d13f-4107-b78a-32d84a3800b8" />
 
 Now if I enter this variable into the box it is synced and if I change the associated slider value it will overwrite the variable!
 
 Simply change the synced variable name or untick the box and reload sillytavern or setvar to whatever you want to undo this.
-
-> [!NOTE]
-> The search button to the right of the variable name is current non-functional, but will be implemented in the future!
 
 ### The Sync to Macros System (For Power Users only!)
 
