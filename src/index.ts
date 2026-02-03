@@ -10,7 +10,8 @@ import groupTemplate from './group.html';
 // import { MacrosParser } from '../../../../macros.js';
 // import { MacroCategory } from '../../../../macros/engine/MacroRegistry';
 
-const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser, substituteParams, variables, resolveVariable } = (SillyTavern.getContext() as any);
+const { saveSettingsDebounced, event_types, eventSource, chatCompletionSettings, Popup, powerUserSettings: power_user, macros, MacrosParser, substituteParams, variables, resolveVariable, textCompletionSettings: textgenerationwebui_settings, mainApi
+} = (SillyTavern.getContext() as any);
 
 const MODULE_NAME = 'sliderMacros';
 const DEBOUNCE_DELAY = 300;
@@ -767,7 +768,7 @@ function syncVariableToSlider(slider: SliderModel): boolean {
 
     // Convert variable value to appropriate slider type
     let convertedValue: number | string | boolean = slider.value;
-    
+
     if (slider.type === 'Numeric') {
         const numVal = Number(variableValue);
         if (!isNaN(numVal)) {
@@ -839,6 +840,11 @@ interface ChatCompletionRequestData {
 interface DropdownOption {
     key: string;
     value: string;
+}
+
+interface TextCompletionRequestData {
+    text_completion_source: string;
+    custom_include_body: string;
 }
 
 interface SliderModel {
@@ -926,22 +932,22 @@ function isSliderRenderable(slider: SliderModel): boolean {
     if (!slider.enabled || !slider.name) {
         return false;
     }
-    
+
     // Macro mode: needs a property (macro name)
     if (slider.sliderMode !== 'variable' && slider.property) {
         return true;
     }
-    
+
     // Variable mode: needs sync enabled with a variable name
     if (slider.sliderMode === 'variable' && slider.syncEnabled && slider.syncVariable) {
         return true;
     }
-    
+
     // Fallback for legacy sliders (no mode set): check property
     if (!slider.sliderMode && slider.property) {
         return true;
     }
-    
+
     return false;
 }
 
@@ -1201,27 +1207,62 @@ async function createCollection(): Promise<void> {
 }
 
 // This function is used to bind the active collection to a preset.
+
 function bindToPreset(): void {
     const settings = getSettings();
-    const presetName = chatCompletionSettings.preset_settings_openai;
-    if (!presetName) {
-        toastr.warning('No Chat Completion preset selected.');
+    const chatPreset = chatCompletionSettings.preset_settings_openai;
+    const textPreset = textgenerationwebui_settings.preset;
+    const context = SillyTavern.getContext() as any;
+    const currentAPI = context.mainApi;
+
+    console.warn(`[SliderMacros] bindToPreset: currentAPI='${currentAPI}'`);
+
+    let targetPreset = '';
+    let presetType = '';
+
+    if (currentAPI === 'openai') {
+        targetPreset = chatPreset;
+        presetType = 'Chat Completion';
+    } else if (currentAPI === 'textgenerationwebui') {
+        targetPreset = textPreset;
+        presetType = 'Text Completion';
+    } else {
+        console.warn(`[SliderMacros] Unsupported API for binding: ${currentAPI}`);
+        toastr.warning(`Slider binding is not supported for the current API: ${currentAPI}`);
         return;
     }
+
+    if (!targetPreset) {
+        toastr.warning('No active preset found to bind.');
+        return;
+    }
+
     const activeCollection = settings.collections.find(c => c.active);
     if (!activeCollection) {
+        toastr.warning('No active collection selected.');
         return;
     }
-    const collectionWithPreset = settings.collections.find(c => c.presets.includes(presetName));
+
+    const collectionWithPreset = settings.collections.find(c => c.presets.includes(targetPreset));
     if (collectionWithPreset) {
-        collectionWithPreset.presets.splice(collectionWithPreset.presets.indexOf(presetName), 1);
+        // Remove from old collection
+        collectionWithPreset.presets.splice(collectionWithPreset.presets.indexOf(targetPreset), 1);
+
+        // If it was a different collection, warn and move
         if (collectionWithPreset !== activeCollection) {
-            toastr.warning(`The preset will be unbound from another collection "${collectionWithPreset.name}".`);
-            activeCollection.presets.push(presetName);
+            toastr.warning(`The ${presetType} preset "${targetPreset}" was unbound from collection "${collectionWithPreset.name}" and bound to "${activeCollection.name}".`);
+            // Clear any existing presets on the active collection (enforce single binding)
+            activeCollection.presets = [];
+            activeCollection.presets.push(targetPreset);
+        } else {
+            // Toggle off behavior
+            toastr.info(`The ${presetType} preset "${targetPreset}" un-bound from collection "${activeCollection.name}".`);
         }
     } else {
-        activeCollection.presets.push(presetName);
-        toastr.info(`Selecting the preset "${presetName}" will now automatically pick the sliders collection "${activeCollection.name}".`);
+        // Clear any existing presets on the active collection (enforce single binding)
+        activeCollection.presets = [];
+        activeCollection.presets.push(targetPreset);
+        toastr.info(`Selecting the ${presetType} preset "${targetPreset}" will now automatically pick the sliders collection "${activeCollection.name}".`);
     }
 
     saveSettingsDebounced();
@@ -1299,8 +1340,20 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         option.selected = collection.active;
         elements.collections.appendChild(option);
     });
-    const presetName = chatCompletionSettings.preset_settings_openai;
-    elements.bindToPreset.classList.toggle('toggleEnabled', activeCollection.presets.includes(presetName));
+    const chatPreset = chatCompletionSettings.preset_settings_openai;
+    const textPreset = textgenerationwebui_settings.preset;
+    const context = SillyTavern.getContext() as any;
+    const currentAPI = context.mainApi;
+
+    // Check if the current active preset FOR THE SELECTED API TYPE is bound to this selected collection (for the purposes of lighting up the bind button, pretty colors, etc.)
+    let isBound = false;
+    if (currentAPI === 'openai') {
+        isBound = activeCollection.presets.includes(chatPreset);
+    } else if (currentAPI === 'textgenerationwebui') {
+        isBound = activeCollection.presets.includes(textPreset);
+    }
+
+    elements.bindToPreset.classList.toggle('toggleEnabled', isBound);
 
     // Helper function to create a slider card element
     const createSliderCard = (slider: SliderModel, index: number): DocumentFragment => {
@@ -1747,10 +1800,10 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const syncForceCheckbox = renderer.content.querySelector('input[name="syncForce"]') as HTMLInputElement;
         const forceHintElement = renderer.content.querySelector('.slider_macros_force_sync_field') as HTMLDivElement;
         const defaultHintElement = renderer.content.querySelector('.slider_macros_sync_hint_default') as HTMLDivElement;
-        
+
         // Set initial value
         if (syncForceCheckbox) syncForceCheckbox.checked = slider.syncForce || false;
-        
+
         // Update hint visibility based on force mode
         const updateForceHintVisibility = () => {
             if (forceHintElement && defaultHintElement) {
@@ -1764,7 +1817,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             updateVariableStatus();
         };
         updateForceHintVisibility();
-        
+
         if (syncForceCheckbox) {
             syncForceCheckbox.addEventListener('change', () => {
                 slider.syncForce = syncForceCheckbox.checked;
@@ -1778,14 +1831,14 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const modeVariableBtn = renderer.content.querySelector('button[name="modeVariable"]') as HTMLButtonElement;
         const modeHintElement = renderer.content.querySelector('.slider_macros_mode_hint') as HTMLDivElement;
         const macroNameField = renderer.content.querySelector('.slider_macros_macro_input_row')?.closest('.slider_macros_field') as HTMLDivElement;
-        
+
         // Initialize slider mode if not set
         if (!slider.sliderMode) slider.sliderMode = 'macro';
-        
+
         // Update mode button states and visibility
         const updateModeUI = () => {
             const isMacroMode = slider.sliderMode === 'macro';
-            
+
             // Update button active states
             if (modeMacroBtn) {
                 modeMacroBtn.classList.toggle('active', isMacroMode);
@@ -1793,7 +1846,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             if (modeVariableBtn) {
                 modeVariableBtn.classList.toggle('active', !isMacroMode);
             }
-            
+
             // Update hint visibility
             if (modeHintElement) {
                 const macroHint = modeHintElement.querySelector('.macro-hint') as HTMLElement;
@@ -1801,12 +1854,12 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                 if (macroHint) macroHint.style.display = isMacroMode ? 'block' : 'none';
                 if (variableHint) variableHint.style.display = isMacroMode ? 'none' : 'block';
             }
-            
+
             // In variable mode, hide macro name field and auto-enable sync
             if (macroNameField) {
                 macroNameField.style.display = isMacroMode ? 'block' : 'none';
             }
-            
+
             // When switching to variable mode, auto-enable sync if not already
             if (!isMacroMode && syncEnabledCheckbox && !slider.syncEnabled) {
                 slider.syncEnabled = true;
@@ -1815,7 +1868,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             }
         };
         updateModeUI();
-        
+
         if (modeMacroBtn) {
             modeMacroBtn.addEventListener('click', () => {
                 slider.sliderMode = 'macro';
@@ -1823,7 +1876,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                 debouncedSaveSettings();
             });
         }
-        
+
         if (modeVariableBtn) {
             modeVariableBtn.addEventListener('click', () => {
                 slider.sliderMode = 'variable';
@@ -2250,18 +2303,31 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
     // Always try to attach to the correct parent if available, even if drawer exists
     const completionPromptManager = document.getElementById('completion_prompt_manager');
-    if (completionPromptManager) {
+    const aiResponseConfiguration = document.getElementById('ai_response_configuration');
+    const context = SillyTavern.getContext() as any;
+    const currentAPI = context.mainApi;
+
+    const isChat = currentAPI === 'openai';
+    const isText = currentAPI === 'textgenerationwebui';
+
+    if (completionPromptManager && isChat) {
         if (drawer.parentElement !== completionPromptManager || completionPromptManager.firstChild !== drawer) {
             completionPromptManager.insertBefore(drawer, completionPromptManager.firstChild);
         }
-    } else {
-        // If the target container doesn't exist yet, we don't attach the drawer.
-        // The MutationObserver will call this again when it appears.
+    } else if (aiResponseConfiguration && isText) {
+        if (drawer.previousElementSibling !== aiResponseConfiguration) {
+            aiResponseConfiguration.after(drawer);
+        }
     }
 
     // Refresh references after potential DOM changes
     container = document.getElementById(CONTAINER_ID) as HTMLDivElement;
     const collectionSelect = document.getElementById(COLLECTION_SELECT_ID) as HTMLSelectElement;
+
+    if (!container || !collectionSelect) {
+        console.warn('[SliderMacros] Container or Collection Select not found in DOM (Drawer not attached?). Aborting render.');
+        return;
+    }
 
     // Populate collection dropdown
     collectionSelect.innerHTML = '';
@@ -2748,7 +2814,7 @@ function updateSliderMacros(settings: ExtensionSettings) {
         if (!slider.enabled || !slider.property) {
             return;
         }
-        
+
         // Skip macro registration for sliders in "variable" mode
         if (slider.sliderMode === 'variable') {
             console.debug(`[SliderMacros] Skipping macro registration for "${slider.name}" - variable mode`);
@@ -2851,7 +2917,7 @@ function formatColor(hex: string, format: 'hex' | 'rgb' | 'hsv'): string {
 
 // Preset binding event handler without the chat completion body append stuff.
 function setupEventHandlers(settings: ExtensionSettings): void {
-    eventSource.on(event_types.OAI_PRESET_CHANGED_AFTER, () => {
+    const onPresetChanged = (delay: number = 500) => {
         const presetName = chatCompletionSettings.preset_settings_openai;
         const activeCollection = settings.collections.find(c => c.active);
         if (!activeCollection) {
@@ -2869,8 +2935,13 @@ function setupEventHandlers(settings: ExtensionSettings): void {
         // Re-render the completions sliders to reflect the new collection or restore valid UI
         setTimeout(() => {
             renderCompletionSliders(settings);
-        }, 500);
-    });
+        }, delay);
+    };
+
+    // Switched this to account for both text and chat completion now. I added in main api changed as well to account for switching between the two.
+    eventSource.on(event_types.OAI_PRESET_CHANGED_AFTER, () => onPresetChanged(500));
+    eventSource.on(event_types.PRESET_CHANGED, () => onPresetChanged(500));
+    eventSource.on(event_types.MAIN_API_CHANGED, () => onPresetChanged(3000));
 
     // CHAT_CHANGED event: Force sync slider values to variables when switching chats
     // This ensures variables are properly set with slider values in the new chat context
@@ -2888,12 +2959,24 @@ function setupEventHandlers(settings: ExtensionSettings): void {
 // Mutation observer for the oddities of the Sillytavern DOM redraws on preset switching. As usual, Prolix knew the magic word.
 const observer = new MutationObserver(debounce(() => {
     const settings = getSettings();
-    const target = document.getElementById('completion_prompt_manager');
+    const chatTarget = document.getElementById('completion_prompt_manager');
+    const textTarget = document.getElementById('ai_response_configuration');
     const drawer = document.getElementById('slider_macros_drawer');
+    const context = SillyTavern.getContext() as any;
+    const currentAPI = context.mainApi;
 
-    // If target exists but drawer is missing or displaced, re-render/move it.
-    if (target && (!drawer || drawer.parentElement !== target)) {
-        renderCompletionSliders(settings);
+    // Only attempt render if API matches target type
+    const isChat = currentAPI === 'openai';
+    const isText = currentAPI === 'textgenerationwebui';
+
+    if (isChat && chatTarget) {
+        if (!drawer || drawer.parentElement !== chatTarget) {
+            renderCompletionSliders(settings);
+        }
+    } else if (isText && textTarget) {
+        if (!drawer || drawer.previousElementSibling !== textTarget) {
+            renderCompletionSliders(settings);
+        }
     }
 }, 500));
 
@@ -2905,6 +2988,6 @@ const observer = new MutationObserver(debounce(() => {
     addSettingsControls(settings);
     renderCompletionSliders(settings);
     setupEventHandlers(settings);
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
     saveSettingsDebounced();
 })();
