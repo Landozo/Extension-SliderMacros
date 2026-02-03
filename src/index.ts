@@ -711,9 +711,10 @@ function setVariableFromTemplate(varName: string, template: string, scope: 'loca
 
 /**
  * Syncs a slider's value to its bound variable if sync is enabled and configured.
- * Only syncs to EXISTING variables - will not create new ones.
+ * With syncForce=true, creates the variable if it doesn't exist.
+ * With syncForce=false (default), only syncs to EXISTING variables.
  * @param slider - The slider model to sync
- * @returns True if sync was successful, false if disabled or variable doesn't exist
+ * @returns True if sync was successful, false if disabled or variable doesn't exist (when not forcing)
  */
 function syncSliderToVariable(slider: SliderModel): boolean {
     if (!slider.syncEnabled || !slider.syncVariable) {
@@ -722,7 +723,14 @@ function syncSliderToVariable(slider: SliderModel): boolean {
 
     const scope = slider.syncScope || 'local';
 
-    // Only sync to existing variables
+    // Check if force mode is enabled - if so, always write (creates variable if needed)
+    if (slider.syncForce) {
+        setVariableValue(slider.syncVariable, slider.value, scope);
+        console.debug(`[SliderMacros] Force-synced slider "${slider.name}" value to ${scope} variable "${slider.syncVariable}":`, slider.value);
+        return true;
+    }
+
+    // Non-force mode: only sync to existing variables
     if (!hasVariable(slider.syncVariable, scope)) {
         console.debug(`[SliderMacros] Skipping sync - variable "${slider.syncVariable}" does not exist in ${scope} scope`);
         return false;
@@ -731,6 +739,92 @@ function syncSliderToVariable(slider: SliderModel): boolean {
     setVariableValue(slider.syncVariable, slider.value, scope);
     console.debug(`[SliderMacros] Synced slider "${slider.name}" value to ${scope} variable "${slider.syncVariable}":`, slider.value);
     return true;
+}
+
+/**
+ * Syncs a variable's value TO a slider (force read).
+ * Used when syncForce is enabled to read the variable value on load.
+ * @param slider - The slider model to update
+ * @returns True if sync was successful and slider value was updated
+ */
+function syncVariableToSlider(slider: SliderModel): boolean {
+    if (!slider.syncEnabled || !slider.syncVariable || !slider.syncForce) {
+        return false;
+    }
+
+    const scope = slider.syncScope || 'local';
+
+    // Check if variable exists
+    if (!hasVariable(slider.syncVariable, scope)) {
+        console.debug(`[SliderMacros] Cannot read from variable "${slider.syncVariable}" - does not exist in ${scope} scope`);
+        return false;
+    }
+
+    const variableValue = getVariableValue(slider.syncVariable, scope);
+    if (variableValue === undefined) {
+        return false;
+    }
+
+    // Convert variable value to appropriate slider type
+    let convertedValue: number | string | boolean = slider.value;
+    
+    if (slider.type === 'Numeric') {
+        const numVal = Number(variableValue);
+        if (!isNaN(numVal)) {
+            convertedValue = numVal;
+        }
+    } else if (slider.type === 'Boolean' || slider.type === 'Checkbox') {
+        if (typeof variableValue === 'boolean') {
+            convertedValue = variableValue;
+        } else if (typeof variableValue === 'string') {
+            convertedValue = variableValue.toLowerCase() === 'true' || variableValue === '1';
+        } else if (typeof variableValue === 'number') {
+            convertedValue = variableValue !== 0;
+        }
+    } else {
+        // String-based types (MultiSelect, Dropdown, Color)
+        convertedValue = String(variableValue);
+    }
+
+    slider.value = convertedValue;
+    console.debug(`[SliderMacros] Force-read variable "${slider.syncVariable}" to slider "${slider.name}":`, convertedValue);
+    return true;
+}
+
+/**
+ * Forces sync of all sliders that have syncForce enabled.
+ * Called on CHAT_CHANGED to enforce variable values when switching chats.
+ * @param settings - Extension settings containing slider collections
+ * @param direction - 'write' to push slider values to variables, 'read' to pull variable values to sliders
+ */
+function forceSyncAllSliders(settings: ExtensionSettings, direction: 'write' | 'read' = 'write'): void {
+    const activeCollection = settings.collections.find(c => c.active);
+    if (!activeCollection) {
+        return;
+    }
+
+    let syncCount = 0;
+    activeCollection.sliders.forEach((slider) => {
+        if (!slider.syncEnabled || !slider.syncForce || !slider.syncVariable) {
+            return;
+        }
+
+        if (direction === 'write') {
+            // Force write: push slider value to variable (creates if needed)
+            if (syncSliderToVariable(slider)) {
+                syncCount++;
+            }
+        } else {
+            // Force read: pull variable value to slider
+            if (syncVariableToSlider(slider)) {
+                syncCount++;
+            }
+        }
+    });
+
+    if (syncCount > 0) {
+        console.log(`[SliderMacros] Force-synced ${syncCount} slider(s) to variables (${direction})`);
+    }
 }
 
 // ============================================================================
@@ -770,6 +864,8 @@ interface SliderModel {
     syncEnabled: boolean;
     syncVariable: string;
     syncScope: 'local' | 'global';
+    syncForce: boolean; // Force write (create variable if not exists) and read (sync slider from variable on load)
+    sliderMode: 'macro' | 'variable'; // 'macro' = register as macro (default), 'variable' = only affect variable
 }
 
 interface SliderGroup {
@@ -816,6 +912,50 @@ function getNextOrder(collection: SliderCollection): number {
     const ungroupedSliderOrders = collection.sliders.filter(s => !s.groupId).map(s => s.order);
     const allOrders = [...groupOrders, ...ungroupedSliderOrders];
     return allOrders.length > 0 ? Math.max(...allOrders) + 1 : 0;
+}
+
+/**
+ * Checks if a slider can be rendered in the completion panel.
+ * A slider is renderable if:
+ * - It has a name and is enabled
+ * - AND either has a macro property (macro mode) OR has a sync variable configured (variable mode)
+ * @param slider - The slider to check
+ * @returns True if the slider should be rendered
+ */
+function isSliderRenderable(slider: SliderModel): boolean {
+    if (!slider.enabled || !slider.name) {
+        return false;
+    }
+    
+    // Macro mode: needs a property (macro name)
+    if (slider.sliderMode !== 'variable' && slider.property) {
+        return true;
+    }
+    
+    // Variable mode: needs sync enabled with a variable name
+    if (slider.sliderMode === 'variable' && slider.syncEnabled && slider.syncVariable) {
+        return true;
+    }
+    
+    // Fallback for legacy sliders (no mode set): check property
+    if (!slider.sliderMode && slider.property) {
+        return true;
+    }
+    
+    return false;
+}
+
+/**
+ * Gets a unique identifier for a slider (used for DOM element IDs).
+ * For macro mode, uses the property name. For variable mode, uses the sync variable.
+ * @param slider - The slider to get an ID for
+ * @returns A unique identifier string
+ */
+function getSliderId(slider: SliderModel): string {
+    if (slider.sliderMode === 'variable' && slider.syncVariable) {
+        return 'slider_var_' + slider.syncVariable + '_' + (slider.syncScope || 'local');
+    }
+    return 'slider_macro_' + slider.property;
 }
 
 export function getSettings(): ExtensionSettings {
@@ -1114,6 +1254,8 @@ function createSlider(): void {
         syncEnabled: false,
         syncVariable: '',
         syncScope: 'local',
+        syncForce: false,
+        sliderMode: 'macro',
     });
 
     saveSettingsDebounced();
@@ -1326,13 +1468,22 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                 arrow.className = 'slider_macros_dropdown_arrow';
                 arrow.textContent = '→';
 
-                const valueInput = document.createElement('input');
-                valueInput.type = 'text';
+                const valueInput = document.createElement('textarea');
                 valueInput.className = 'text_pole slider_macros_dropdown_value';
-                valueInput.placeholder = 'Macro value';
+                valueInput.placeholder = 'Macro value (multi-line supported)';
                 valueInput.value = opt.value;
+                valueInput.rows = Math.min(4, Math.max(1, opt.value.split('\n').length)); // Dynamic rows up to 4
+                // Prevent Enter key from being captured by parent handlers (e.g., SillyTavern's chat submit)
+                valueInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.stopPropagation(); // Allow newline insertion, prevent parent capture
+                    }
+                });
                 valueInput.addEventListener('input', () => {
                     slider.dropdownOptions[optIndex].value = valueInput.value;
+                    // Adjust rows dynamically based on content (max 4 lines)
+                    const lineCount = valueInput.value.split('\n').length;
+                    valueInput.rows = Math.min(4, Math.max(1, lineCount));
                     debouncedRender();
                     debouncedSaveSettings();
                 });
@@ -1542,6 +1693,7 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             if (!variableStatusElement) return;
             const varName = syncVariableInput?.value.trim() || '';
             const scope = syncScopeSelect?.value as 'local' | 'global' || 'local';
+            const isForceMode = slider.syncForce || false;
 
             if (!varName) {
                 variableStatusElement.textContent = '';
@@ -1560,6 +1712,9 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
                 if (hasVariable(varName, otherScope)) {
                     variableStatusElement.textContent = `⚠ Variable exists in ${otherScope} scope, not ${scope}`;
                     variableStatusElement.className = 'slider_macros_variable_status not-found';
+                } else if (isForceMode) {
+                    variableStatusElement.textContent = '⚡ Variable will be created on first sync (Force mode)';
+                    variableStatusElement.className = 'slider_macros_variable_status force-create';
                 } else {
                     variableStatusElement.textContent = '✗ Variable does not exist - sync will be skipped';
                     variableStatusElement.className = 'slider_macros_variable_status not-found';
@@ -1584,6 +1739,95 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             syncScopeSelect.addEventListener('change', () => {
                 slider.syncScope = syncScopeSelect.value as 'local' | 'global';
                 updateVariableStatus();
+                debouncedSaveSettings();
+            });
+        }
+
+        // Force sync checkbox handler
+        const syncForceCheckbox = renderer.content.querySelector('input[name="syncForce"]') as HTMLInputElement;
+        const forceHintElement = renderer.content.querySelector('.slider_macros_force_sync_field') as HTMLDivElement;
+        const defaultHintElement = renderer.content.querySelector('.slider_macros_sync_hint_default') as HTMLDivElement;
+        
+        // Set initial value
+        if (syncForceCheckbox) syncForceCheckbox.checked = slider.syncForce || false;
+        
+        // Update hint visibility based on force mode
+        const updateForceHintVisibility = () => {
+            if (forceHintElement && defaultHintElement) {
+                if (slider.syncForce) {
+                    defaultHintElement.style.display = 'none';
+                } else {
+                    defaultHintElement.style.display = 'block';
+                }
+            }
+            // Update variable status text based on force mode
+            updateVariableStatus();
+        };
+        updateForceHintVisibility();
+        
+        if (syncForceCheckbox) {
+            syncForceCheckbox.addEventListener('change', () => {
+                slider.syncForce = syncForceCheckbox.checked;
+                updateForceHintVisibility();
+                debouncedSaveSettings();
+            });
+        }
+
+        // Slider mode toggle buttons
+        const modeMacroBtn = renderer.content.querySelector('button[name="modeMacro"]') as HTMLButtonElement;
+        const modeVariableBtn = renderer.content.querySelector('button[name="modeVariable"]') as HTMLButtonElement;
+        const modeHintElement = renderer.content.querySelector('.slider_macros_mode_hint') as HTMLDivElement;
+        const macroNameField = renderer.content.querySelector('.slider_macros_macro_input_row')?.closest('.slider_macros_field') as HTMLDivElement;
+        
+        // Initialize slider mode if not set
+        if (!slider.sliderMode) slider.sliderMode = 'macro';
+        
+        // Update mode button states and visibility
+        const updateModeUI = () => {
+            const isMacroMode = slider.sliderMode === 'macro';
+            
+            // Update button active states
+            if (modeMacroBtn) {
+                modeMacroBtn.classList.toggle('active', isMacroMode);
+            }
+            if (modeVariableBtn) {
+                modeVariableBtn.classList.toggle('active', !isMacroMode);
+            }
+            
+            // Update hint visibility
+            if (modeHintElement) {
+                const macroHint = modeHintElement.querySelector('.macro-hint') as HTMLElement;
+                const variableHint = modeHintElement.querySelector('.variable-hint') as HTMLElement;
+                if (macroHint) macroHint.style.display = isMacroMode ? 'block' : 'none';
+                if (variableHint) variableHint.style.display = isMacroMode ? 'none' : 'block';
+            }
+            
+            // In variable mode, hide macro name field and auto-enable sync
+            if (macroNameField) {
+                macroNameField.style.display = isMacroMode ? 'block' : 'none';
+            }
+            
+            // When switching to variable mode, auto-enable sync if not already
+            if (!isMacroMode && syncEnabledCheckbox && !slider.syncEnabled) {
+                slider.syncEnabled = true;
+                syncEnabledCheckbox.checked = true;
+                updateVariableConfigVisibility();
+            }
+        };
+        updateModeUI();
+        
+        if (modeMacroBtn) {
+            modeMacroBtn.addEventListener('click', () => {
+                slider.sliderMode = 'macro';
+                updateModeUI();
+                debouncedSaveSettings();
+            });
+        }
+        
+        if (modeVariableBtn) {
+            modeVariableBtn.addEventListener('click', () => {
+                slider.sliderMode = 'variable';
+                updateModeUI();
                 debouncedSaveSettings();
             });
         }
@@ -2039,25 +2283,33 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
     // Helper function to render a single slider to a target container
     const renderSliderToContainer = (slider: SliderModel, targetContainer: HTMLElement) => {
-        if (!slider.enabled || !slider.property || !slider.name) {
+        // Use the renderable check helper for both macro and variable mode sliders
+        if (!isSliderRenderable(slider)) {
             return;
+        }
+
+        // Force read: sync variable value to slider before rendering (if enabled)
+        if (slider.syncEnabled && slider.syncForce && slider.syncVariable) {
+            syncVariableToSlider(slider);
         }
 
         const renderer = document.createElement('template');
         renderer.innerHTML = sliderTemplate;
 
-        const sliderId = CSS.escape('slider_macro_' + slider.property);
+        const sliderId = CSS.escape(getSliderId(slider));
         const titleElement = renderer.content.querySelector('.range-block-title') as HTMLSpanElement;
 
         const existingSlider = document.getElementById(sliderId);
         if (existingSlider) {
-            toastr.warning('Duplicate slider property name: ' + slider.property);
+            const identifierType = slider.sliderMode === 'variable' ? 'variable' : 'property';
+            const identifierValue = slider.sliderMode === 'variable' ? slider.syncVariable : slider.property;
+            toastr.warning(`Duplicate slider ${identifierType} name: ${identifierValue}`);
             console.warn('Duplicate slider detected:', sliderId);
             return;
         }
 
         titleElement.textContent = slider.name;
-        console.log(`Rendering slider: ${slider.name} (${slider.type})`);
+        console.log(`Rendering slider: ${slider.name} (${slider.type}) [${slider.sliderMode || 'macro'} mode]`);
 
         // --- Numeric Slider Logic ---
         if (slider.type === 'Numeric' || !slider.type) { // Default to Numeric
@@ -2372,18 +2624,18 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
     const completionItems: CompletionRenderItem[] = [];
 
-    // Add groups (only if they have enabled sliders)
+    // Add groups (only if they have renderable sliders)
     activeCollection.groups.forEach((group) => {
         const slidersInGroup = activeCollection.sliders.filter(s => s.groupId === group.id);
-        const enabledCount = slidersInGroup.filter(s => s.enabled && s.property && s.name).length;
+        const enabledCount = slidersInGroup.filter(s => isSliderRenderable(s)).length;
         if (enabledCount > 0) {
             completionItems.push({ type: 'group', group });
         }
     });
 
-    // Add ungrouped sliders (only if enabled)
+    // Add ungrouped sliders (only if renderable)
     activeCollection.sliders.forEach((slider) => {
-        if (!slider.groupId && slider.enabled && slider.property && slider.name) {
+        if (!slider.groupId && isSliderRenderable(slider)) {
             completionItems.push({ type: 'slider', slider });
         }
     });
@@ -2424,7 +2676,7 @@ function renderCompletionSliders(settings: ExtensionSettings): void {
 
             const groupCount = document.createElement('span');
             groupCount.className = 'slider_macros_group_count';
-            const enabledCount = slidersInGroup.filter(s => s.enabled && s.property && s.name).length;
+            const enabledCount = slidersInGroup.filter(s => isSliderRenderable(s)).length;
             groupCount.textContent = `(${enabledCount})`;
 
             groupHeader.appendChild(groupChevron);
@@ -2494,6 +2746,12 @@ function updateSliderMacros(settings: ExtensionSettings) {
     // Loop through each slider in the active collection and register it as a macro.
     activeCollection.sliders.forEach((slider) => {
         if (!slider.enabled || !slider.property) {
+            return;
+        }
+        
+        // Skip macro registration for sliders in "variable" mode
+        if (slider.sliderMode === 'variable') {
+            console.debug(`[SliderMacros] Skipping macro registration for "${slider.name}" - variable mode`);
             return;
         }
 
@@ -2612,6 +2870,19 @@ function setupEventHandlers(settings: ExtensionSettings): void {
         setTimeout(() => {
             renderCompletionSliders(settings);
         }, 500);
+    });
+
+    // CHAT_CHANGED event: Force sync slider values to variables when switching chats
+    // This ensures variables are properly set with slider values in the new chat context
+    eventSource.on(event_types.CHAT_CHANGED, () => {
+        console.log('[SliderMacros] Chat changed - force syncing sliders to variables');
+        // Small delay to ensure chat context is fully loaded
+        setTimeout(() => {
+            const currentSettings = getSettings();
+            forceSyncAllSliders(currentSettings, 'write');
+            // Also re-render sliders to reflect any variable changes
+            renderCompletionSliders(currentSettings);
+        }, 100);
     });
 }
 // Mutation observer for the oddities of the Sillytavern DOM redraws on preset switching. As usual, Prolix knew the magic word.

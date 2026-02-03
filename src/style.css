@@ -464,6 +464,69 @@
     box-sizing: border-box;
 }
 
+/* Mode Toggle Buttons */
+.slider_macros_mode_toggle {
+    display: flex;
+    gap: 4px;
+}
+
+.slider_macros_mode_btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    opacity: 0.6;
+}
+
+.slider_macros_mode_btn.active {
+    opacity: 1;
+    background: var(--SmartThemeBlurTintColor, rgba(255, 255, 255, 0.1));
+    border-color: var(--SmartThemeQuoteColor, #888);
+}
+
+.slider_macros_mode_btn:hover {
+    opacity: 0.9;
+}
+
+.slider_macros_mode_hint {
+    font-size: 0.8em;
+    color: var(--SmartThemeQuoteColor, #888);
+    margin-top: 6px;
+}
+
+.slider_macros_mode_hint .macro-hint,
+.slider_macros_mode_hint .variable-hint {
+    display: none;
+}
+
+/* Force Sync Toggle */
+.slider_macros_force_sync_field {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid var(--SmartThemeBorderColor, #333);
+}
+
+.slider_macros_force_toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.slider_macros_force_toggle input[type="checkbox"] {
+    width: clamp(10px, 16px, 16px);
+    height: clamp(10px, 16px, 16px);
+}
+
+/* Force create status color */
+.slider_macros_variable_status.force-create {
+    color: var(--SmartThemeQuoteColor, #f90);
+}
+
 /* Duplicate Button */
 .slider_macros_btn_duplicate {
     color: var(--SmartThemeQuoteColor, #888);
@@ -732,31 +795,40 @@
 
 .slider_macros_dropdown_option_row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 6px;
 }
 
 .slider_macros_dropdown_key {
     flex: 1;
     min-width: 0;
+    margin-top: 6px; /* Align with first line of textarea */
 }
 
 .slider_macros_dropdown_arrow {
     color: var(--SmartThemeQuoteColor, #888);
     font-size: 0.9em;
     flex-shrink: 0;
+    margin-top: 10px; /* Align with first line of textarea */
 }
 
 .slider_macros_dropdown_value {
     flex: 1.5;
     min-width: 0;
     font-family: monospace;
+    resize: vertical;
+    min-height: 32px;
+    max-height: calc(4 * 1.4em + 16px); /* 4 lines max with padding */
+    line-height: 1.4;
+    overflow-y: auto;
 }
 
 .slider_macros_btn_remove_option {
     opacity: 0.5;
     padding: 4px 8px;
     min-width: unset;
+    margin-top: 4px; /* Align with first line of textarea */
+    align-self: flex-start;
 }
 
 .slider_macros_btn_remove_option:hover {

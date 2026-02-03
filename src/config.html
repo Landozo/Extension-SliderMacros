@@ -65,6 +65,26 @@
                 <!-- Group options populated dynamically -->
             </select>
         </div>
+        <!-- Slider Mode Toggle -->
+        <div class="slider_macros_type_section">
+            <div class="slider_macros_field">
+                <label class="slider_macros_label">Slider Mode</label>
+                <div class="slider_macros_mode_toggle">
+                    <button type="button" class="menu_button slider_macros_mode_btn" name="modeMacro" data-mode="macro">
+                        <i class="fa-solid fa-code"></i>
+                        <span>Macro</span>
+                    </button>
+                    <button type="button" class="menu_button slider_macros_mode_btn" name="modeVariable" data-mode="variable">
+                        <i class="fa-solid fa-database"></i>
+                        <span>Variable</span>
+                    </button>
+                </div>
+                <div class="slider_macros_mode_hint" name="modeHint">
+                    <span class="macro-hint">Slider registers as a macro ({{macroName}})</span>
+                    <span class="variable-hint">Slider only affects a variable (no macro registered)</span>
+                </div>
+            </div>
+        </div>
         <!-- Variable Sync Options -->
         <div class="slider_macros_type_section">
             <div class="slider_macros_field">
@@ -88,7 +108,14 @@
                     </button> -->
                 </div>
                 <div class="slider_macros_variable_status" name="variableStatus"></div>
-                <div class="slider_macros_sync_hint">Syncs slider value to an existing variable. Use {{getvar::name}} or
+                <div class="slider_macros_field slider_macros_force_sync_field">
+                    <label class="checkbox_label slider_macros_force_toggle">
+                        <input type="checkbox" name="syncForce">
+                        <span>Force Read/Write</span>
+                    </label>
+                    <div class="slider_macros_sync_hint">Creates variable if it doesn't exist. Reads variable value on load to update slider.</div>
+                </div>
+                <div class="slider_macros_sync_hint slider_macros_sync_hint_default">Syncs slider value to an existing variable. Use {{getvar::name}} or
                     {{getglobalvar::name}} to retrieve.</div>
             </div>
         </div>
