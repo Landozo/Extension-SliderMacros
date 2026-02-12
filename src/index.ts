@@ -913,6 +913,58 @@ function generateGroupId(): string {
     return 'group_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
 }
 
+/**
+ * Normalizes a slider object by ensuring all fields exist with sensible defaults.
+ * This handles backward compatibility for sliders created in older extension versions
+ * that may be missing fields added in later updates.
+ * @param slider - A partial slider object (e.g., from an older export)
+ * @returns The same slider object, mutated in-place with all missing fields filled in
+ */
+function normalizeSlider(slider: Partial<SliderModel>): SliderModel {
+    if (slider.name === undefined) slider.name = '';
+    if (slider.property === undefined) slider.property = '';
+    if (slider.type === undefined) slider.type = 'Numeric';
+    if (slider.min === undefined) slider.min = '0';
+    if (slider.max === undefined) slider.max = '1';
+    if (slider.step === undefined) slider.step = '0.01';
+    if (slider.value === undefined) slider.value = 0;
+    if (slider.enabled === undefined) slider.enabled = true;
+    if (!slider.options) slider.options = [];
+    if (!slider.dropdownOptions) slider.dropdownOptions = [];
+    if (!slider.colorFormat) slider.colorFormat = 'hex';
+    if (!slider.checkboxTrueValue) slider.checkboxTrueValue = 'true';
+    if (!slider.checkboxFalseValue) slider.checkboxFalseValue = 'false';
+    if (slider.groupId === undefined) slider.groupId = null;
+    if (slider.order === undefined) slider.order = 0;
+    if (slider.syncEnabled === undefined) slider.syncEnabled = false;
+    if (slider.syncVariable === undefined) slider.syncVariable = '';
+    if (slider.syncScope === undefined) slider.syncScope = 'local';
+    if (slider.syncForce === undefined) slider.syncForce = false;
+    if (slider.sliderMode === undefined) slider.sliderMode = 'macro';
+    return slider as SliderModel;
+}
+
+/**
+ * Normalizes a collection object by ensuring all fields exist with sensible defaults.
+ * Also normalizes all sliders within the collection.
+ * @param collection - A partial collection object
+ * @returns The same collection object, mutated in-place with all missing fields filled in
+ */
+function normalizeCollection(collection: Partial<SliderCollection>): SliderCollection {
+    if (collection.active === undefined) collection.active = false;
+    if (collection.name === undefined) collection.name = 'Unnamed';
+    if (!collection.sliders) collection.sliders = [];
+    if (!collection.presets) collection.presets = [];
+    if (!collection.groups) collection.groups = [];
+    // Normalize each slider in the collection
+    collection.sliders.forEach(normalizeSlider);
+    // Normalize group orders
+    collection.groups.forEach((group, i) => {
+        if (group.order === undefined) group.order = i;
+    });
+    return collection as SliderCollection;
+}
+
 function getNextOrder(collection: SliderCollection): number {
     const groupOrders = collection.groups.map(g => g.order);
     const ungroupedSliderOrders = collection.sliders.filter(s => !s.groupId).map(s => s.order);
@@ -1036,6 +1088,13 @@ export function getSettings(): ExtensionSettings {
                 delete (slider as any).variableScope;
                 delete (slider as any).syncToVariable;
             }
+            // Migration: Add syncForce and sliderMode if missing
+            if (slider.syncForce === undefined) {
+                slider.syncForce = false;
+            }
+            if (!slider.sliderMode) {
+                slider.sliderMode = 'macro';
+            }
         }
     }
 
@@ -1092,7 +1151,11 @@ export function addSettingsControls(settings: ExtensionSettings): void {
             return;
         }
         const fileName = activeCollection.name + '.json';
-        const fileContent = JSON.stringify(activeCollection.sliders, null, 4);
+        const exportData = {
+            sliders: activeCollection.sliders,
+            groups: activeCollection.groups,
+        };
+        const fileContent = JSON.stringify(exportData, null, 4);
         const blob = new Blob([fileContent], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -1111,12 +1174,25 @@ export function addSettingsControls(settings: ExtensionSettings): void {
             try {
                 const fileName = file.name.split('.').shift() || 'imported';
                 const fileContent = event.target?.result as string;
-                const parsedSliders = JSON.parse(fileContent) as SliderModel[];
-                if (!Array.isArray(parsedSliders)) {
+                const parsed = JSON.parse(fileContent);
+
+                // Support both old format (plain array of sliders) and new envelope format ({ sliders, groups })
+                let sliders: Partial<SliderModel>[];
+                let groups: SliderGroup[] = [];
+
+                if (Array.isArray(parsed)) {
+                    // Old format: plain array of sliders
+                    sliders = parsed;
+                } else if (parsed && Array.isArray(parsed.sliders)) {
+                    // New envelope format: { sliders: [...], groups: [...] }
+                    sliders = parsed.sliders;
+                    groups = Array.isArray(parsed.groups) ? parsed.groups : [];
+                } else {
                     toastr.error('Invalid JSON file format.');
                     return;
                 }
-                processImport(fileName, parsedSliders, settings);
+
+                processImport(fileName, sliders, groups, settings);
             } catch {
                 toastr.error('Failed to parse JSON file.');
                 return;
@@ -1130,7 +1206,7 @@ export function addSettingsControls(settings: ExtensionSettings): void {
     renderSliderConfigs(settings);
 }
 
-async function processImport(fileName: string, parsedSliders: SliderModel[], settings: ExtensionSettings): Promise<void> {
+async function processImport(fileName: string, parsedSliders: Partial<SliderModel>[], parsedGroups: SliderGroup[], settings: ExtensionSettings): Promise<void> {
     const newName = await Popup.show.input('Import Collection', 'Enter the name of the new collection:', fileName);
     if (!newName) {
         return;
@@ -1142,11 +1218,23 @@ async function processImport(fileName: string, parsedSliders: SliderModel[], set
         return;
     }
 
+    // Normalize all imported sliders to ensure they have every required field
+    const normalizedSliders = parsedSliders.map(s => normalizeSlider(s));
+
+    // Strip groupId references that point to non-existent groups
+    const validGroupIds = new Set(parsedGroups.map(g => g.id));
+    for (const slider of normalizedSliders) {
+        if (slider.groupId && !validGroupIds.has(slider.groupId)) {
+            slider.groupId = null;
+        }
+    }
+
     const newCollection: SliderCollection = {
         active: true,
         name: newName,
-        sliders: parsedSliders,
+        sliders: normalizedSliders,
         presets: [],
+        groups: parsedGroups,
     };
 
     settings.collections.forEach((collection) => {
@@ -1201,6 +1289,7 @@ async function createCollection(): Promise<void> {
         name,
         sliders: [],
         presets: [],
+        groups: [],
     });
     saveSettingsDebounced();
     renderSliderConfigs(settings);
@@ -1357,6 +1446,9 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
 
     // Helper function to create a slider card element
     const createSliderCard = (slider: SliderModel, index: number): DocumentFragment => {
+        // Ensure all fields have defaults (handles sliders from older versions)
+        normalizeSlider(slider);
+
         const renderer = document.createElement('template');
         renderer.innerHTML = configTemplate;
 
@@ -1400,12 +1492,6 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         // Macro search elements
         const searchMacroButton = renderer.content.querySelector('button[name="searchMacro"]') as HTMLButtonElement;
         const macroStatusElement = renderer.content.querySelector('.slider_macros_macro_status') as HTMLDivElement;
-
-        // Ensure defaults for new fields
-        if (!slider.dropdownOptions) slider.dropdownOptions = [];
-        if (!slider.colorFormat) slider.colorFormat = 'hex';
-        if (!slider.checkboxTrueValue) slider.checkboxTrueValue = 'true';
-        if (!slider.checkboxFalseValue) slider.checkboxFalseValue = 'false';
 
         // Set initial values
         nameInput.value = slider.name;
@@ -1469,10 +1555,6 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
             renderer.content.querySelector('input[name="option3"]') as HTMLInputElement,
             renderer.content.querySelector('input[name="option4"]') as HTMLInputElement,
         ];
-
-        if (!slider.options) {
-            slider.options = ['', '', '', ''];
-        }
 
         // Fill option inputs
         optionInputs.forEach((input, i) => {
@@ -1831,9 +1913,6 @@ function renderSliderConfigs(settings: ExtensionSettings): void {
         const modeVariableBtn = renderer.content.querySelector('button[name="modeVariable"]') as HTMLButtonElement;
         const modeHintElement = renderer.content.querySelector('.slider_macros_mode_hint') as HTMLDivElement;
         const macroNameField = renderer.content.querySelector('.slider_macros_macro_input_row')?.closest('.slider_macros_field') as HTMLDivElement;
-
-        // Initialize slider mode if not set
-        if (!slider.sliderMode) slider.sliderMode = 'macro';
 
         // Update mode button states and visibility
         const updateModeUI = () => {
